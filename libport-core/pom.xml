@@ -1,0 +1,78 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.latte.libport</groupId>
+  <artifactId>libport-core</artifactId>
+  <version>0.1.0</version>
+  <packaging>so</packaging>
+
+  <properties>
+    <corelib.libname>libport-core</corelib.libname>
+    <corelib.libversion>${project.version}</corelib.libversion>
+    <corelib.soname>${corelib.libname}.so.0</corelib.soname>
+  </properties>
+
+  <name>${project.artifactId}</name>
+  <url>http://maven.apache.org</url>
+
+
+  <parent>
+    <groupId>org.latte.libport</groupId>
+    <artifactId>libport-main</artifactId>
+    <version>0.1.0</version>
+  </parent>
+  <build>
+    <plugins>
+      <plugin>
+	<groupId>org.codehaus.mojo</groupId>
+	<artifactId>native-maven-plugin</artifactId>
+	<extensions>true</extensions>
+	<configuration>
+	  <compilerStartOptions>
+	    <compilerStartOption>-O2 -fPIC</compilerStartOption>
+	  </compilerStartOptions>
+	  <sources>
+	    <source>
+	      <directory>src/main/native</directory>
+	      <fileNames>
+		<fileName>syscall.c</fileName>
+	      </fileNames>
+	    </source>          
+	  </sources>
+	  <linkerStartOptions>
+	    <linkerStartOption>-shared -Wl,-soname,${corelib.soname}</linkerStartOption>
+	  </linkerStartOptions>
+	</configuration>
+      </plugin>
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-install-plugin</artifactId>
+	<version>2.5.2</version>
+	<executions>
+	  <execution>
+	    <id>default-install</id>
+	    <phase>install</phase>
+	    <configuration>
+	      <skip>true</skip>
+	    </configuration>
+	  </execution>
+	  <execution>
+	    <id>install-so-file</id>
+	    <phase>install</phase>
+	    <goals>
+	      <goal>install-file</goal>
+	    </goals>
+	    <configuration>
+	      <file>${project.build.directory}/${project.name}.${project.packaging}</file>
+	      <groupId>${project.groupId}</groupId>
+	      <artifactId>${project.artifactId}</artifactId>
+	      <version>${project.version}</version>
+	      <packaging>so</packaging>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

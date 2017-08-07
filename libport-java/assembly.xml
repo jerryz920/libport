@@ -1,0 +1,39 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.0.0 http://maven.apache.org/xsd/assembly-2.0.0.xsd">
+  <!-- TODO: a jarjar format would be better -->
+  <id>with-dependencies</id>
+  <formats>
+    <format>jar</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <dependencySets>
+    <dependencySet>
+      <outputDirectory>/</outputDirectory>
+      <useProjectArtifact>true</useProjectArtifact>
+      <unpack>true</unpack>
+      <scope>runtime</scope>
+      <excludes>
+	<exclude>*:so*</exclude>
+      </excludes>
+    </dependencySet>
+  </dependencySets>
+  <!-- If we need to copy 'so', example here -->
+  <!--
+  <moduleSets>
+    <moduleSet>
+      <useAllReactorProjects>true</useAllReactorProjects>
+	<excludes>
+	  <exclude>org.latte.libport:libport-java</exclude>
+	</excludes>
+      <binaries>
+	<includes>
+	  <include>org.latte.libport:libport-core</include>
+	</includes>
+	<outputDirectory>/</outputDirectory>
+	<unpack>false</unpack>
+      </binaries>
+    </moduleSet>
+  </moduleSets>
+  -->
+</assembly>
