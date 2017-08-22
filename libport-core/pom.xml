@@ -34,11 +34,14 @@
 	  </compilerStartOptions>
 	  <sources>
 	    <source>
+	      <directory>src/main/native/include</directory>
+	    </source>
+	    <source>
 	      <directory>src/main/native</directory>
 	      <fileNames>
-		<fileName>syscall.c</fileName>
+		<fileName>core.cc</fileName>
 	      </fileNames>
-	    </source>          
+	    </source>
 	  </sources>
 	  <linkerStartOptions>
 	    <linkerStartOption>-shared -Wl,-soname,${corelib.soname}</linkerStartOption>
