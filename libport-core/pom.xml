@@ -30,7 +30,7 @@
 	<extensions>true</extensions>
 	<configuration>
 	  <compilerStartOptions>
-	    <compilerStartOption>-O2 -fPIC</compilerStartOption>
+	    <compilerStartOption>-std=c++11 -O2 -fPIC</compilerStartOption>
 	  </compilerStartOptions>
 	  <sources>
 	    <source>
