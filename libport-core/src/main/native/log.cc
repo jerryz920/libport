@@ -21,14 +21,14 @@ void setloglevel(int upto) {
 void log(const char* msg, ...) {
   va_list args;
   va_start(args, msg);
-  syslog(current_level, msg, args);
+  vsyslog(current_level, msg, args);
   va_end(args);
 }
 
 void log_err(const char *msg, ...) {
   va_list args;
   va_start(args, msg);
-  syslog(LOG_ERR, msg, args);
+  vsyslog(LOG_ERR, msg, args);
   va_end(args);
 }
 
