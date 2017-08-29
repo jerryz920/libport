@@ -15,11 +15,14 @@ int libport_init(const char *metadata_host, const char *metadata_service,
     int port_per_principal) {
   return 0;
 }
+// create image
 
 int create_principal(uint64_t uuid, ...) {
+  // create principal
   return 0;
 }
 
+// test principal
 int speak_for(uint64_t uuid, ...) {
   return 0;
 }

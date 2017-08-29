@@ -40,6 +40,8 @@
 	      <directory>src/main/native</directory>
 	      <fileNames>
 		<fileName>core.cc</fileName>
+		<fileName>metadata.cc</fileName>
+		<fileName>log.cc</fileName>
 	      </fileNames>
 	    </source>
 	  </sources>

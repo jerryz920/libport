@@ -63,6 +63,8 @@ flags = [
 '-I',
 '/usr/include/x86_64-linux-gnu/',
 '-I',
+'/usr/local/include',
+'-I',
 'include'
 ]
 

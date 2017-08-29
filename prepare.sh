@@ -1,5 +1,5 @@
 
-apt-get install -y libboost-all-dev libssl-dev
+apt-get install -y libboost-all-dev libssl-dev cmake3
 mkdir -p net
 cd net
 git clone https://github.com/Microsoft/cpprestsdk.git casablanca
