@@ -41,14 +41,13 @@
 
 
 namespace {
-  web::json::value format_request(const std::string& principal,
+  web::json::value format_request(const std::string& speaker,
         const std::vector<std::string>& statements) {
     web::json::value result = web::json::value::object(true);
     web::json::value otherValues = web::json::value::array();
-    for (size_t i = 0; i < statements.size(); i++) {
-      otherValues[i] = web::json::value::string(statements[i]);
+    for (size_t i = 0; i < statements.size(); i++) { otherValues[i] = web::json::value::string(statements[i]);
     }
-    result["principal"] = web::json::value::string(principal);
+    result["principal"] = web::json::value::string(speaker);
     result["otherValues"] = otherValues;
     return result;
   }
@@ -76,7 +75,7 @@ namespace {
   inline std::string consume_status(const web::http::http_response& res, const std::string& msg) {
         if (res.status_code() != web::http::status_codes::OK) {
           std::stringstream err;
-          err << "error in " << msg << ":" << res.status_code();
+          err << "error in " << msg << ":" << res.status_code() << "\n";
           latte::log(err.str().c_str());
           return err.str();
         }
@@ -100,7 +99,7 @@ namespace {
   DebugTask debug_task() {
     return [](web::http::http_response res) {
       if (latte::is_debug()) {
-        latte::log("response body: %s", res.to_string().c_str());
+        latte::log("response body: \n%s", res.to_string().c_str());
       }
       return pplx::task_from_result(res);
     };
@@ -122,10 +121,11 @@ namespace {
 
 namespace latte {
 pplx::task<web::http::http_response> MetadataServiceClient::post_statement(
-    const std::string& api_path, const std::string& target,
+    const std::string& api_path, const std::string& speaker,
     const std::vector<std::string>& statements) {
   if (is_debug()) {
-    log("metadata action: %s, target %s", api_path.c_str(), target.c_str());
+    log("");
+    log("new metadata action: %s, target %s", api_path.c_str(), speaker.c_str());
     log("---start of statement---");
     for (auto s : statements) {
       log("%s;", s.c_str());
@@ -136,7 +136,7 @@ pplx::task<web::http::http_response> MetadataServiceClient::post_statement(
   web::http::http_request new_request(web::http::methods::POST);
   new_request.set_request_uri(api_path);
   new_request.headers().set_content_type("application/json");
-  new_request.set_body(format_request(target, statements));
+  new_request.set_body(format_request(speaker, statements));
   return this->client_.request(new_request);
 }
 
