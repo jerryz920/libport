@@ -33,19 +33,117 @@
 #ifndef _PORT_MANAGER_H
 #define _PORT_MANAGER_H
 
-
-#include <unordered_map>
-#include "principal.h"
+#include <cstdint>
+#include <utility>
+#include <map>
+#include <sstream>
+#include <algorithm>
 
 namespace latte {
 
-
 class PortManager {
 
+  public:
+    typedef std::pair<uint32_t, uint32_t> PortPair;
 
+    constexpr static uint32_t BadPort = (uint32_t) -1;
+    constexpr static std::pair<uint32_t, uint32_t> Bad = std::make_pair(0, 0); 
+
+    PortManager(const PortManager&) = delete;
+    PortManager& operator =(const PortManager&) = delete;
+    PortManager(): PortManager(1, 65535) {}
+    PortManager(uint32_t low, uint32_t high): low_(low), high_(high) {
+      free_map_[low] = high + 1;
+    }
+
+    /// Return [l,r) pair
+    inline PortPair allocate(uint32_t cnt) {
+      PortPair index = find_fit(cnt);
+      if (index == Bad) {
+        throw_full();
+      }
+      uint32_t available = index.second - index.first;
+      uint32_t remain = available - cnt;
+      if (remain >= 1) {
+        /// Set in-place would usually avoid reallocating internal node
+        free_map_[index.first] = index.first + remain;
+      }
+      allocated_[index.first + remain] = index.second;
+      return std::make_pair(index.first + remain, index.second);
+    }
+
+    // Using any port in range should deallocate it, but we want to make
+    // sure it is programmed correctly
+    inline void deallocate(uint32_t p) {
+      auto allocate_index = allocated_.find(p);
+      if (allocate_index == allocated_.end()) {
+        throw_bad_port(p);
+      }
+      auto free_index = free_map_.lower_bound(p);
+      /// merge right
+      if (free_index != free_map_.end()) {
+        auto right_index = free_index;
+        if (right_index->first == allocate_index->second) {
+          allocate_index->second = right_index->second;
+          free_map_.erase(right_index);
+        }
+      }
+      if (free_index != free_map_.begin()) {
+        auto left_index = std::prev(free_index);
+        if (left_index->second == allocate_index->first) {
+          // merge in place
+          left_index->second = allocate_index->second;
+        } else {
+          free_map_[allocate_index->first] = allocate_index->second;
+        }
+      } else {
+        free_map_[allocate_index->first] = allocate_index->second;
+      }
+      allocated_.erase(allocate_index);
+    }
+
+    inline bool is_allocated(uint32_t p) {
+      auto index = allocated_.lower_bound(p);
+      if (index == allocated_.end()) {
+        return false;
+      }
+      /// [l,r) includes p if r > p and l <= p. First condition is hold by lower_bound.
+      return index->second > p;
+    }
+
+    /// Check how many segment there are with size no larger than upto
+    inline uint32_t report_fragment(uint32_t upto) const {
+      return std::count_if(free_map_.cbegin(), free_map_.cend(),
+          [upto](const PortPair &p) { return p.second - p.first <= upto; });
+    }
 
   private:
-    std::unordered_map<uint64_t, Principal> principals_;
+
+    inline void throw_full() {
+      throw std::runtime_error("no available port range");
+    }
+
+    inline void throw_bad_port(uint32_t p) {
+      std::stringstream err_msg;
+      err_msg << "port " << p << " is a bad port";
+      throw std::runtime_error(err_msg.str());
+    }
+
+    PortPair find_fit(uint32_t cnt) const {
+      for (auto i = free_map_.cbegin(); i != free_map_.cend(); ++i) {
+        if (cnt <= i->second - i->first) {
+          return *i;
+        }
+      }
+      return Bad;
+    }
+
+    /// The port range that is managed by this manager
+    uint32_t low_;
+    uint32_t high_;
+    /// stores [l, r) intervals
+    std::map<uint32_t, uint32_t> free_map_;
+    std::map<uint32_t, uint32_t> allocated_;
 };
 
 }

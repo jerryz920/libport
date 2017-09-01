@@ -209,6 +209,7 @@ void MetadataServiceClient::endorse_image(const std::string& image_hash,
 
 bool MetadataServiceClient::has_property(const std::string& principal_ip,
     int port, const std::string& property) {
+  std::cout << "this is executed!\n";
   return this->post_statement("/attestAppProperty", "", {format_netaddr(principal_ip, port),
       property})
     .then(debug_task())
