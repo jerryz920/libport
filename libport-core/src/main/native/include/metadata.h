@@ -50,7 +50,7 @@ class MetadataServiceClient {
     MetadataServiceClient() = delete;
     MetadataServiceClient(const MetadataServiceClient&) = delete;
     MetadataServiceClient& operator =(const MetadataServiceClient&) = delete;
-    MetadataServiceClient(const std::string& server_url);
+    MetadataServiceClient(const std::string &server_url);
 
 
     /// the byte array is just 

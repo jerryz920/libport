@@ -27,51 +27,59 @@
    policies, either expressed or implied, of the FreeBSD Project.
 
 
-   The export header for external usage of this client side port management library
+   Image definition
    Author: Yan Zhai
+
+    Accessor object definition
 
 */
 
-
-#ifndef _LIBPORT_H_
-#define _LIBPORT_H_
-
-#include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif 
-
-/// init:
-//   * initialize the location of metadata service
-//   * fill in the local port and exclude range
-//   args:
-//    * metadata_host: IP address or host name
-//    * metadata_service: port address of metadata service
-int libport_init(const char *metadata_host, const char *metadata_service,
-    const char *scheme);
+#ifndef _LIBPORT_ACCESSOR_OBJECT_H
+#define _LIBPORT_ACCESSOR_OBJECT_H
+#include <string>
+#include "cpprest/json.h"
+#include <unordered_set>
 
 
-/// create_principal:
-//   * create a new principal, set up port range
-//  args:
-//   * uuid: the ID of given principal
-int create_principal(uint64_t uuid, const char *image, const char *string, int nport);
+namespace latte {
 
-//// image and object interfaces proxied for the metadata client
+  class AccessorObject {
+
+    public:
+      AccessorObject() = delete;
+      AccessorObject(const AccessorObject&) = delete;
+      AccessorObject& operator =(const AccessorObject&) = delete;
+
+      AccessorObject& operator =(AccessorObject &&other) {
+        name_ = std::move(other.name_);
+        acls_ = std::move(other.acls_);
+        return *this;
+      }
+
+      AccessorObject(AccessorObject &&other):
+        name_(std::move(other.name_)), acls_(std::move(other.acls_)) {}
+      AccessorObject(const std::string& name): name_(name) {}
+
+      inline const std::string& name() const { return name_; }
+      inline const std::unordered_set<std::string> acls() const { return acls_; }
+      inline void add_acl(const std::string &acl) { acls_.insert(acl); }
+      inline void del_acl(const std::string &acl) { acls_.erase(acl); }
+      inline bool has_acl(const std::string &acl) const {
+        return acls_.find(acl) != acls_.cend();
+      }
+
+      web::json::value to_json() const;
+      static AccessorObject parse(const std::string &data);
 
 
-/// delete_principal:
-//   * remove a principal, and withdraw the mapping, as well as
-//   * the statement
-int delete_principal(uint64_t uuid);
+    private:
+      std::string name_;
+      std::unordered_set<std::string> acls_;
+  };
 
-
-#ifdef __cplusplus
 }
-#endif
-
-
 
 
 #endif
+
+

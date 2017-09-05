@@ -47,17 +47,20 @@ class PortManager {
     typedef std::pair<uint32_t, uint32_t> PortPair;
 
     constexpr static uint32_t BadPort = (uint32_t) -1;
-    constexpr static std::pair<uint32_t, uint32_t> Bad = std::make_pair(0, 0); 
+    constexpr static std::pair<uint32_t, uint32_t> Bad = std::make_pair(0, 0);
 
     PortManager(const PortManager&) = delete;
     PortManager& operator =(const PortManager&) = delete;
     PortManager(): PortManager(1, 65535) {}
     PortManager(uint32_t low, uint32_t high): low_(low), high_(high) {
-      free_map_[low] = high + 1;
+      free_map_[low] = high;
     }
+    inline uint32_t low() const { return low_; }
+    inline uint32_t high() const { return high_; }
 
     /// Return [l,r) pair
     inline PortPair allocate(uint32_t cnt) {
+      constexpr PortPair Bad;
       PortPair index = find_fit(cnt);
       if (index == Bad) {
         throw_full();
@@ -67,6 +70,8 @@ class PortManager {
       if (remain >= 1) {
         /// Set in-place would usually avoid reallocating internal node
         free_map_[index.first] = index.first + remain;
+      } else {
+        free_map_.erase(index.first);
       }
       allocated_[index.first + remain] = index.second;
       return std::make_pair(index.first + remain, index.second);
@@ -130,6 +135,7 @@ class PortManager {
     }
 
     PortPair find_fit(uint32_t cnt) const {
+      constexpr PortPair Bad;
       for (auto i = free_map_.cbegin(); i != free_map_.cend(); ++i) {
         if (cnt <= i->second - i->first) {
           return *i;

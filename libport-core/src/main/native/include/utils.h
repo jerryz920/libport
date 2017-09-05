@@ -27,51 +27,15 @@
    policies, either expressed or implied, of the FreeBSD Project.
 
 
-   The export header for external usage of this client side port management library
+   some useful tools
    Author: Yan Zhai
 
 */
-
-
-#ifndef _LIBPORT_H_
-#define _LIBPORT_H_
-
-#include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif 
-
-/// init:
-//   * initialize the location of metadata service
-//   * fill in the local port and exclude range
-//   args:
-//    * metadata_host: IP address or host name
-//    * metadata_service: port address of metadata service
-int libport_init(const char *metadata_host, const char *metadata_service,
-    const char *scheme);
-
-
-/// create_principal:
-//   * create a new principal, set up port range
-//  args:
-//   * uuid: the ID of given principal
-int create_principal(uint64_t uuid, const char *image, const char *string, int nport);
-
-//// image and object interfaces proxied for the metadata client
-
-
-/// delete_principal:
-//   * remove a principal, and withdraw the mapping, as well as
-//   * the statement
-int delete_principal(uint64_t uuid);
-
-
-#ifdef __cplusplus
-}
-#endif
+#ifndef _LIBPORT_UTILS_H
+#define _LIBPORT_UTILS_H
 
 
 
 
 #endif
+

@@ -27,51 +27,71 @@
    policies, either expressed or implied, of the FreeBSD Project.
 
 
-   The export header for external usage of this client side port management library
+   Image definition
    Author: Yan Zhai
 
 */
 
+#ifndef _LIBPORT_IMAGE_H
+#define _LIBPORT_IMAGE_H
 
-#ifndef _LIBPORT_H_
-#define _LIBPORT_H_
+#include <string>
+#include "cpprest/json.h"
 
-#include <stdint.h>
+namespace latte {
 
-#ifdef __cplusplus
-extern "C" {
-#endif 
+class Image {
 
-/// init:
-//   * initialize the location of metadata service
-//   * fill in the local port and exclude range
-//   args:
-//    * metadata_host: IP address or host name
-//    * metadata_service: port address of metadata service
-int libport_init(const char *metadata_host, const char *metadata_service,
-    const char *scheme);
+  public:
 
+    Image() = delete;
+    Image(const Image& image) = delete;
+    Image& operator =(const Image& other) = delete;
 
-/// create_principal:
-//   * create a new principal, set up port range
-//  args:
-//   * uuid: the ID of given principal
-int create_principal(uint64_t uuid, const char *image, const char *string, int nport);
-
-//// image and object interfaces proxied for the metadata client
+    Image(Image&& other): hash_(std::move(other.hash_)),
+      url_(std::move(other.url_)), revision_(std::move(other.revision_)),
+      configs_(std::move(other.configs_)){}
+    Image(const std::string &hash, const std::string &url,
+        const std::string &revision, const std::string &configs=""):
+      hash_(hash), url_(url),
+      revision_(revision), configs_(configs){}
 
 
-/// delete_principal:
-//   * remove a principal, and withdraw the mapping, as well as
-//   * the statement
-int delete_principal(uint64_t uuid);
+    Image& operator =(Image&& other) {
+      hash_ = std::move(other.hash_);
+      url_ = std::move(other.url_);
+      revision_ = std::move(other.revision_);
+      configs_ = std::move(other.configs_);
+      return *this;
+    }
 
+    inline const std::string& hash() const {
+      return hash_;
+    }
 
-#ifdef __cplusplus
+    inline const std::string& url() const {
+      return url_;
+    }
+
+    inline const std::string& revision() const {
+      return revision_;
+    }
+
+    inline const std::string& configs() const {
+      return configs_;
+    }
+
+    web::json::value to_json() const;
+    static Image parse(const std::string &data);
+  private:
+
+    std::string hash_;
+    std::string url_;
+    std::string revision_;
+    std::string configs_;
+};
+
 }
-#endif
-
-
-
 
 #endif
+

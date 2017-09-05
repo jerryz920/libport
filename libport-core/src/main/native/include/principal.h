@@ -40,6 +40,7 @@
 #include <cstdint>
 #include <string>
 #include <algorithm>
+#include "cpprest/json.h"
 
 namespace latte {
 class Principal {
@@ -52,23 +53,22 @@ class Principal {
 
     Principal(Principal &&other):
       id_(other.id_), local_lo_(other.local_lo_),
-      local_hi_(other.local_hi_), reserved_(std::move(other.reserved_)),
-      statements_(std::move(other.statements_)) { }
+      local_hi_(other.local_hi_), image_(std::move(other.image_)),
+      configs_(std::move(other.configs_)) {}
 
     Principal& operator =(Principal &&other) {
       id_ = other.id_;
       local_lo_ = other.local_lo_;
       local_hi_ = other.local_hi_;
-      reserved_ = std::move(other.reserved_);
-      statements_ = std::move(other.statements_);
+      image_ = std::move(other.image_);
+      configs_ = std::move(other.configs_);
       return *this;
     }
 
-    /// We use "copy" on the statement strings, just trying to avoid life
-    // management between different language runtimes.
-    Principal(uint64_t id, int lo, int hi, std::list<std::string> statements):
-      id_(id), local_lo_(lo), local_hi_(hi), reserved_(),
-      statements_(statements.begin(), statements.end()) { }
+    Principal(uint64_t id, int lo, int hi, const std::string& image,
+        const std::string& configs=""):
+      id_(id), local_lo_(lo), local_hi_(hi), image_(image),
+      configs_(configs){}
 
     inline uint64_t id() const { return id_; }
     inline int lo() const { return local_lo_; }
@@ -82,44 +82,25 @@ class Principal {
         local_hi_ = hi;
       }
     }
-
-    inline void add_reserved(int lo, int hi) {
-      reserved_.emplace_back(std::make_pair(lo, hi));
+    inline const std::string& image() const {
+      return image_;
     }
 
-    inline void del_reserved(int lo, int hi) {
-      reserved_.remove(std::make_pair(lo, hi));
+    inline const std::string& configs() const {
+      return configs_;
     }
 
-    inline bool is_reserved(int p) const {
-      return find_if(reserved_.cbegin(),
-          reserved_.cend(), [p](std::pair<int, int> np) {
-             return p <= np.second && p >= np.first;
-             }) == reserved_.cend();
-    }
-
-    inline const std::list<std::pair<int, int>>& reserved() const {
-      return reserved_;
-    }
-
-    inline const std::list<std::string>& statements() const {
-      return statements_;
-    }
-
-    inline void add_statement(const std::string &s) {
-      statements_.push_back(s);
-    }
-
-    inline void add_statement(std::string &&s) {
-      statements_.emplace_back(std::move(s));
-    }
+    web::json::value to_json() const;
+    static Principal parse(const std::string &data);
 
   private:
+    /// Note we don't include IP address because it should be determined
+    // at runtime.
     uint64_t id_;
     int local_lo_;
     int local_hi_;
-    std::list<std::pair<int, int>> reserved_;
-    std::list<std::string> statements_;
+    std::string image_;
+    std::string configs_; // configs is properly escaped
 };
 }
 #endif

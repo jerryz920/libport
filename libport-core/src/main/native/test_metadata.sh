@@ -8,7 +8,7 @@ fi
 go build $1/metadata_stub.go
 ./metadata_stub &
 p=$!
-sleep 1
+sleep 1.5
 ./test_metadata
 if [ $? ]; then
   echo passed

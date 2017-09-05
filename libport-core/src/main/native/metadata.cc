@@ -140,7 +140,7 @@ pplx::task<web::http::http_response> MetadataServiceClient::post_statement(
   return this->client_.request(new_request);
 }
 
-MetadataServiceClient::MetadataServiceClient(const std::string& server_url):
+MetadataServiceClient::MetadataServiceClient(const std::string &server_url):
   client_(server_url) {
   }
 
