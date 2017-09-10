@@ -39,6 +39,7 @@
 #include <string>
 #include "cpprest/json.h"
 #include <unordered_set>
+#include <memory>
 
 
 namespace latte {
@@ -70,6 +71,7 @@ namespace latte {
 
       web::json::value to_json() const;
       static AccessorObject parse(const std::string &data);
+      static AccessorObject from_json(web::json::value&& v);
 
 
     private:

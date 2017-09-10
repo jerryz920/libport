@@ -91,7 +91,9 @@ class Principal {
     }
 
     web::json::value to_json() const;
+    static Principal from_json(web::json::value v);
     static Principal parse(const std::string &data);
+
 
   private:
     /// Note we don't include IP address because it should be determined

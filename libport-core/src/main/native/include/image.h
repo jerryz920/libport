@@ -83,6 +83,7 @@ class Image {
 
     web::json::value to_json() const;
     static Image parse(const std::string &data);
+    static Image from_json(web::json::value&& v);
   private:
 
     std::string hash_;

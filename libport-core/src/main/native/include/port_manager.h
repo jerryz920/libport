@@ -77,6 +77,31 @@ class PortManager {
       return std::make_pair(index.first + remain, index.second);
     }
 
+    /// Allocate exact pair from within the range
+    inline PortPair allocate(uint32_t lo, uint32_t hi) {
+      if (lo < low() || hi > high()) {
+        throw_bad_range(lo, hi);
+      } 
+      if (is_allocated(lo, hi)) {
+        throw_bad_range(lo, hi);
+      }
+      PortPair p = find_fit(lo, hi);
+
+      // adjust left boundary
+      if (p.first < lo) {
+        free_map_[p.first] = lo;
+      } else {
+        free_map_.erase(p.first);
+      }
+      // adjust right boundary
+      if (p.second > hi) {
+        free_map_[hi] = p.second;
+      }
+      // allocate the range
+      allocated_[lo] = hi;
+      return PortPair(lo, hi);
+    }
+
     // Using any port in range should deallocate it, but we want to make
     // sure it is programmed correctly
     inline void deallocate(uint32_t p) {
@@ -107,13 +132,50 @@ class PortManager {
       allocated_.erase(allocate_index);
     }
 
-    inline bool is_allocated(uint32_t p) {
-      auto index = allocated_.lower_bound(p);
-      if (index == allocated_.end()) {
+    inline bool is_allocated(uint32_t p) const {
+      if (allocated_.size() == 0) {
         return false;
       }
-      /// [l,r) includes p if r > p and l <= p. First condition is hold by lower_bound.
+      // order: p < index.first < index.second
+      auto index = allocated_.upper_bound(p);
+      // if index is already the first, then p is not in allocated map for sure
+      if (index == allocated_.cbegin()) {
+        return false;
+      }
+      index = std::prev(index);
+      // order: index.first <= p, just need to confirm index.second > p, then p
+      // must be included in [index.first, index.second). Note that we don't have
+      // overlapped segment, thus if this segment doesn't contain p, no one else will
       return index->second > p;
+    }
+
+    /// Test if the range is partially allocated
+    inline bool is_allocated(uint32_t l, uint32_t h) const {
+      if (allocated_.size() == 0) {
+        return false;
+      }
+      auto index = allocated_.upper_bound(l);
+
+      if (index == allocated_.cbegin()) {
+        // if index is the first, then as long as h > index.first it's overlapped
+        /// order: l < index.first < index.second
+        std::printf("index %u %u, l, h %u %u\n", index->first, index->second,
+            l, h);
+        return index->first < h;
+      } else {
+        auto index2 = std::prev(index);
+        // index2.first <= l < index.first < index.second
+        // either index2.second > l (index2 overlaps with [l,r))
+        // or index.first < h (index overlaps with [l,r))
+        //
+        // In other word, if r <= index.first and index2.second <= l, then the
+        // whole range of [l,r) is not yet allocated.
+        if (index != allocated_.cend()) {
+          std::printf("index %u %u\n", index->first, index->second);
+        }
+        std::printf("index2 %u %u, l, h %u %u\n", index2->first, index2->second, l, h);
+        return index2 ->second > l || (index != allocated_.cend() && index->first < h);
+      }
     }
 
     /// Check how many segment there are with size no larger than upto
@@ -124,13 +186,25 @@ class PortManager {
 
   private:
 
-    inline void throw_full() {
+    inline void throw_full() const {
       throw std::runtime_error("no available port range");
     }
 
-    inline void throw_bad_port(uint32_t p) {
+    inline void throw_bug(std::string msg) const {
+      std::stringstream ss;
+      ss << "a bug occurs:" << msg;
+      throw std::runtime_error(ss.str());
+    }
+
+    inline void throw_bad_port(uint32_t p) const {
       std::stringstream err_msg;
       err_msg << "port " << p << " is a bad port";
+      throw std::runtime_error(err_msg.str());
+    }
+
+    inline void throw_bad_range(uint32_t l, uint32_t r) {
+      std::stringstream err_msg;
+      err_msg << "(" << l << "," << r << ") is a bad range";
       throw std::runtime_error(err_msg.str());
     }
 
@@ -142,6 +216,24 @@ class PortManager {
         }
       }
       return Bad;
+    }
+
+    /// This method is only called after !is_allocated(lo, hi) check, so
+    // it is guaranteed to find a segment that fully contains [lo, hi)
+    PortPair find_fit(uint32_t lo, uint32_t hi) const {
+      constexpr PortPair Bad;
+      auto p = free_map_.upper_bound(lo);
+      /// p won't be first item because there must be a segment with left
+      // edge smaller than lo
+      if (p == free_map_.cbegin()) {
+        throw_bug("consistency broken: must be a segment smaller than lower bound");
+      }
+      p = std::prev(p);
+      /// p->left <= lo, which is guaranteed to be 
+      if (p->second < hi) {
+        throw_bug("consistency broken: target segment must include given range");
+      }
+      return *p;
     }
 
     /// The port range that is managed by this manager

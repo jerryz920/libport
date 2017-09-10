@@ -51,19 +51,18 @@ extern "C" {
 int libport_init(const char *server_url);
 
 
-/// create_principal:
-//   * create a new principal, set up port range
-//  args:
-//   * uuid: the ID of given principal
 int create_principal(uint64_t uuid, const char *image, const char *string, int nport);
-
-//// image and object interfaces proxied for the metadata client
-
+int create_image(const char *image_hash, const char *source_url,
+    const char *source_rev, const char *misc_conf);
+int post_object_acl(const char *obj_id, const char *requirement);
+int endorse_image(const char *image_hash, const char *endorsement);
+bool attest_principal_property(const char *ip, uint32_t port, const char *prop);
+bool attest_principal_access(const char *ip, uint32_t port, const char *obj);
 
 /// delete_principal:
 //   * remove a principal, and withdraw the mapping, as well as
-//   * the statement
-// int delete_principal(uint64_t uuid);
+//   * the statement (the last thing not implemented yet)
+int delete_principal(uint64_t uuid);
 
 
 #ifdef __cplusplus
