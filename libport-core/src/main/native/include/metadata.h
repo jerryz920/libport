@@ -50,7 +50,7 @@ class MetadataServiceClient {
     MetadataServiceClient() = delete;
     MetadataServiceClient(const MetadataServiceClient&) = delete;
     MetadataServiceClient& operator =(const MetadataServiceClient&) = delete;
-    MetadataServiceClient(const std::string &server_url);
+    MetadataServiceClient(const std::string &server_url, const std::string& myid);
 
 
     /// the byte array is just 
@@ -87,12 +87,15 @@ class MetadataServiceClient {
     bool can_access(const std::string& principal_ip, int port,
         const std::string& access_object);
 
+    const std::string& myid() const { return myid_; }
+
   private:
     pplx::task<web::http::http_response> post_statement(const std::string& api_path,
         const std::string& target,
         const std::vector<std::string>& statements);
 
     web::http::client::http_client client_;
+    std::string myid_;
 
     /// just for test purpose
     friend class MetadataServiceDebugger;

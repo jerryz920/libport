@@ -140,15 +140,17 @@ pplx::task<web::http::http_response> MetadataServiceClient::post_statement(
   return this->client_.request(new_request);
 }
 
-MetadataServiceClient::MetadataServiceClient(const std::string &server_url):
-  client_(server_url) {
+MetadataServiceClient::MetadataServiceClient(const std::string &server_url,
+    const std::string& myid):
+  client_(server_url),
+  myid_(myid) {
   }
 
 void MetadataServiceClient::post_new_principal(const std::string& principal_name,
     const std::string& principal_ip, int port_min, int port_max,
     const std::string& image_hash, const std::string& configs) {
 
-  this->post_statement("/postInstanceSet", "", {principal_name, image_hash,
+  this->post_statement("/postInstanceSet", myid(), {principal_name, image_hash,
       "image", format_netaddr(principal_ip, port_min, port_max), configs})
     .then(debug_task())
     .then(json_task("creating principal"))
@@ -163,7 +165,7 @@ void MetadataServiceClient::post_new_principal(const std::string& principal_name
           }
           auto end = wrap.rfind('\'');
           auto key = wrap.substr(start + 1, end - start);
-          return this->post_statement("/updateSubjectSet", "", {key});
+          return this->post_statement("/updateSubjectSet", myid(), {key});
         } catch(std::runtime_error &e) {
           return pplx::task_from_exception<web::http::http_response>(
             std::runtime_error(std::move(e)));
@@ -182,7 +184,7 @@ void MetadataServiceClient::post_new_image(const std::string& image_hash,
     .then([&](web::http::http_response res) -> 
         pplx::task<web::http::http_response> {
         if (res.status_code() == web::http::status_codes::OK) {
-          return this->post_statement("/postImageProperty", "", {
+          return this->post_statement("/postImageProperty", myid(), {
               image_hash, format_image_source(source_url, source_rev, misc_conf)
               });
         } else{
@@ -195,14 +197,14 @@ void MetadataServiceClient::post_new_image(const std::string& image_hash,
 
 void MetadataServiceClient::post_object_acl(const std::string& object_id,
     const std::string& requirement) {
-  this->post_statement("/postObjectAcl", "", {object_id, requirement})
+  this->post_statement("/postObjectAcl", myid(), {object_id, requirement})
     .then(debug_task())
     .then(sink_task("posting acl")).wait();
 }
 
 void MetadataServiceClient::endorse_image(const std::string& image_hash,
     const std::string& endorsement) {
-  this->post_statement("/postImageProperty", "", {image_hash, endorsement})
+  this->post_statement("/postImageProperty", myid(), {image_hash, endorsement})
     .then(debug_task())
     .then(sink_task("endorsing image")).wait();
 }
@@ -210,8 +212,8 @@ void MetadataServiceClient::endorse_image(const std::string& image_hash,
 bool MetadataServiceClient::has_property(const std::string& principal_ip,
     int port, const std::string& property) {
   std::cout << "this is executed!\n";
-  return this->post_statement("/attestAppProperty", "", {format_netaddr(principal_ip, port),
-      property})
+  return this->post_statement("/attestAppProperty", myid(), {
+      format_netaddr(principal_ip, port), property})
     .then(debug_task())
     .then(json_task("attest property"))
     .then([](pplx::task<web::json::value> v) -> bool {
@@ -231,8 +233,8 @@ bool MetadataServiceClient::has_property(const std::string& principal_ip,
 
 bool MetadataServiceClient::can_access(const std::string& principal_ip, int port,
     const std::string& access_object) {
-  return this->post_statement("/appAccessesObject", "", {format_netaddr(principal_ip, port),
-      access_object})
+  return this->post_statement("/appAccessesObject", myid(), {
+      format_netaddr(principal_ip, port), access_object})
     .then(debug_task())
     .then(json_task("attest access"))
     .then([](pplx::task<web::json::value> v) -> bool {

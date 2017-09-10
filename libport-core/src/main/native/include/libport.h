@@ -48,8 +48,7 @@ extern "C" {
 //   args:
 //    * metadata_host: IP address or host name
 //    * metadata_service: port address of metadata service
-int libport_init(const char *metadata_host, const char *metadata_service,
-    const char *scheme);
+int libport_init(const char *server_url);
 
 
 /// create_principal:
@@ -64,7 +63,7 @@ int create_principal(uint64_t uuid, const char *image, const char *string, int n
 /// delete_principal:
 //   * remove a principal, and withdraw the mapping, as well as
 //   * the statement
-int delete_principal(uint64_t uuid);
+// int delete_principal(uint64_t uuid);
 
 
 #ifdef __cplusplus

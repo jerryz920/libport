@@ -4,7 +4,7 @@
 #include "log.h"
 
 int main() {
-  latte::MetadataServiceClient c("http://localhost:10011");
+  latte::MetadataServiceClient c("http://localhost:10011", "");
   latte::setloglevel(LOG_DEBUG);
 
   c.post_new_principal(

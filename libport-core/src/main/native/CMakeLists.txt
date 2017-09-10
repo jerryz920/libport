@@ -12,17 +12,17 @@ find_library(CPPREST cpprest)
 find_library(SSL ssl)
 find_library(CRYPTO crypto)
 
-add_library(port core.cc log.cc metadata.cc)
+add_library(port core.cc log.cc metadata.cc serialization.cc)
 include_directories("${PROJECT_SOURCE_DIR}/include")
 include_directories(SYSTEM "/usr/local/include")
 
 # testing
 enable_testing()
 set(Boost_ADDITIONAL_VERSIONS "1.54" "1.54.0")
+set(library_dependencies boost_system crypto ssl cpprest port)
 
 add_executable(test_port_manager test_port_manager.cc)
 target_include_directories(test_port_manager PRIVATE ${Boost_INCLUDE_DIRS})
-target_include_directories(test_port_manager PRIVATE ${PROJECT_SOURCE_DIR}/subdir)
 # indicates the shared library variant
 target_compile_definitions(test_port_manager PRIVATE "BOOST_TEST_DYN_LINK=1")
 # indicates the link paths, which includes another path pointed library
@@ -30,9 +30,20 @@ target_link_libraries(test_port_manager ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
 add_test(NAME test_port_manager
   COMMAND test_port_manager)
 
+# TODO: is there a way to 
+add_executable(test_serialization test_serialization.cc)
+target_include_directories(test_serialization PRIVATE ${Boost_INCLUDE_DIRS})
+# indicates the shared library variant
+target_compile_definitions(test_serialization PRIVATE "BOOST_TEST_DYN_LINK=1")
+target_link_libraries(test_serialization ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${library_dependencies})
+add_test(NAME test_serialization
+  COMMAND test_serialization)
+
+
 # metadata client test is a separate test with server side option, figure it out.
 add_executable(test_metadata test_metadata.cc)
-target_link_libraries(test_metadata boost_system crypto ssl cpprest port)
+#target_link_libraries(test_metadata boost_system crypto ssl cpprest port)
+target_link_libraries(test_metadata ${library_dependencies})
 
 if (NOT GOTOOL)
   MESSAGE("No go binary found, you may want to manual test this")
