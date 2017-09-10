@@ -187,6 +187,7 @@ namespace latte {
 
   void CoreManager::sync() noexcept {
     try {
+      ::clear_reserved_ports();
       sync_principals();
       sync_objects();
       sync_images();
@@ -230,6 +231,9 @@ namespace latte {
         log_err("principal %llu is not running! Still syncing anyway\n", p.id());
       }
       principals_.emplace(p.id(), make_unique<Principal>(std::move(p)));
+      port_manager_->allocate(p.lo(), p.hi());
+      ::set_child_ports(p.id(), p.lo(), p.hi());
+      ::add_reserved_ports(p.lo(), p.hi());
     }
   }
 
@@ -277,6 +281,8 @@ namespace latte {
 
       client_->post_new_principal(format_principal_id(id), 
           myip_, prange.first, prange.second, image_hash, configs);
+      ::set_child_ports((pid_t)id, prange.first, prange.second);
+      ::add_reserved_ports(prange.first, prange.second);
       if (auto ref = tmp.lock()) {
         notify_created(K_PRINCIPAL, std::string(format_principal_id(id)),
             ref->to_json());
@@ -383,6 +389,7 @@ namespace latte {
     }
     notify_deleted(K_PRINCIPAL, format_principal_id(uuid));
     port_manager_->deallocate(record->second->lo());
+    ::del_reserved_ports(record->second->lo(), record->second->hi());
     index_principals_.erase(record->second->lo());
     principals_.erase(record);
     return 0;
