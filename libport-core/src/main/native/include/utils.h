@@ -34,8 +34,45 @@
 #ifndef _LIBPORT_UTILS_H
 #define _LIBPORT_UTILS_H
 
+#include <sstream>
+#include <iomanip>
+
+namespace latte {
+  namespace utils {
+
+typedef struct {} DecType;
+typedef struct {} HexType;
+typedef decltype(std::dec) ModeType;
+
+inline ModeType&& mode(DecType) {
+  return std::dec;
+}
+
+inline ModeType&& mode(HexType) {
+  return std::hex;
+}
+
+template<typename I, typename BaseType=DecType>
+inline std::string itoa(I i) {
+  std::stringstream ss;
+  ss.exceptions(std::stringstream::failbit);
+  ss << mode(BaseType()) << std::showbase << i;
+  return ss.str();
+}
 
 
+template<typename I>
+inline I atoi(const std::string& s) {
+  std::stringstream ss(s);
+  ss.exceptions(std::stringstream::failbit);
+  I result;
+  ss >> std::setbase(0) >> result;
+  return result;
+}
+
+}
+
+}
 
 #endif
 

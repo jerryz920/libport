@@ -65,7 +65,9 @@ flags = [
 '-I',
 '/usr/local/include',
 '-I',
-'include'
+'include',
+'-I',
+'test-include'
 ]
 
 

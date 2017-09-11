@@ -54,13 +54,13 @@ class MetadataServiceClient {
 
 
     /// the byte array is just 
-    void post_new_principal(
+    virtual void post_new_principal(
         const std::string& principal_name,
         const std::string& principal_ip, int port_min,
         int port_max, const std::string& image_hash,
         const std::string& configs);
 
-    void post_new_image(const std::string& image_hash,
+    virtual void post_new_image(const std::string& image_hash,
         const std::string& source_url,
         const std::string& source_rev,
         const std::string& misc_conf);
@@ -70,27 +70,28 @@ class MetadataServiceClient {
 //
 //    void remove_image(const std::string& image_hash);
 
-    void post_object_acl(const std::string& obj_id,
+    virtual void post_object_acl(const std::string& obj_id,
         const std::string& requirements);
 
     //void endorse_principal(const std::string& host_ip, int port_min,
     //    int port_max, const std::string& endorsement);
 
-    void endorse_image(const std::string& image_hash,
+    virtual void endorse_image(const std::string& image_hash,
         const std::string& endorsement);
 
     //void endorse_source(const std::string& source_url,
     //    const std::string& source_revision, const std::string& endorsement);
 
-    bool has_property(const std::string& principal_ip, int port,
+    virtual bool has_property(const std::string& principal_ip, int port,
         const std::string& property);
-    bool can_access(const std::string& principal_ip, int port,
+    virtual bool can_access(const std::string& principal_ip, int port,
         const std::string& access_object);
 
     const std::string& myid() const { return myid_; }
 
   private:
-    pplx::task<web::http::http_response> post_statement(const std::string& api_path,
+    pplx::task<web::http::http_response> post_statement(
+        const std::string& api_path,
         const std::string& target,
         const std::vector<std::string>& statements);
 

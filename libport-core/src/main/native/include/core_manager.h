@@ -40,7 +40,9 @@
 #include <string>
 #include <sstream>
 #include <mutex>
+#include <thread>
 #include "cpprest/json.h"
+
 
 namespace latte {
 
@@ -50,6 +52,15 @@ class Image;
 class MetadataServiceClient;
 class PortManager;
 
+class SyscallProxy {
+  public:
+    SyscallProxy() {}
+    virtual int set_child_ports(pid_t pid, int lo, int hi) = 0;
+    virtual int get_local_ports(int* lo, int *hi) = 0;
+    virtual int add_reserved_ports(int lo, int hi) = 0;
+    virtual int del_reserved_ports(int lo, int hi) = 0;
+    virtual int clear_reserved_ports() = 0;
+};
 
 class CoreManager {
 
@@ -58,6 +69,7 @@ class CoreManager {
     CoreManager(const CoreManager& other) = delete;
     CoreManager& operator =(const CoreManager& other) = delete;
     CoreManager(CoreManager&& other):
+      terminate_(false),
       myip_(std::move(other.myip_)),
       local_port_lo_(other.local_port_lo_),
       local_port_hi_(other.local_port_hi_),
@@ -68,10 +80,12 @@ class CoreManager {
       principals_(std::move(other.principals_)),
       images_(std::move(other.images_)),
       accessors_(std::move(other.accessors_)),
-      config_root_(std::move(other.config_root_)) {
+      config_root_(std::move(other.config_root_)),
+      proxy_(std::move(other.proxy_)) {
     }
 
     CoreManager& operator =(CoreManager&& other) {
+      terminate_ = false;
       myip_ = std::move(other.myip_);
       local_port_lo_ = other.local_port_lo_;
       local_port_hi_ = other.local_port_hi_;
@@ -83,11 +97,15 @@ class CoreManager {
       images_ = std::move(other.images_);
       accessors_ = std::move(other.accessors_);
       config_root_ = std::move(other.config_root_);
+      proxy_ = std::move(other.proxy_);
       return *this;
     }
 
     CoreManager(const std::string& metadata_url, const std::string& myip,
-        const std::string& persistence_path);
+        const std::string& persistence_path, std::unique_ptr<SyscallProxy> s);
+    ~CoreManager();
+
+
 
     /// operations, we may want to use this as "build_image"
     int create_image(
@@ -128,17 +146,25 @@ class CoreManager {
     /// entrance of syncing thread
     void start_sync_thread();
 
-  private:
+    /// peeking the internal state
+    bool has_principal(uint64_t id) const;
+    bool has_principal_by_port(uint32_t port) const;
+    bool has_image(std::string& hash) const;
+    bool has_accessor(std::string& id) const;
 
-    inline void set_new_config_root(web::json::value&& new_root) {
-      config_root_ = std::move(new_root);
+  protected:
+    /// Methods only intended for testing
+    inline void set_metadata_client(std::unique_ptr<MetadataServiceClient> c) {
+      client_.swap(c);
     }
-    /// trying to sync with the config root about principals, images, and objects
-    void sync() noexcept ;
 
-    void sync_principals();
-    void sync_images();
-    void sync_objects();
+    inline web::json::value get_config_root() {
+      return config_root_;
+    }
+
+    inline void set_syscall_proxy(std::unique_ptr<SyscallProxy> s) {
+      proxy_.swap(s);
+    }
 
     void notify_created(std::string&& type, std::string&& key, web::json::value v);
     void notify_deleted(std::string&& type, std::string&& key);
@@ -147,8 +173,26 @@ class CoreManager {
     constexpr static const char* K_PRINCIPAL = "principals";
     constexpr static const char* K_IMAGE = "images";
     constexpr static const char* K_ACCESSOR = "accessors";
-    constexpr static int SYNC_DURATION = 30; // second
+    constexpr static const int SYNC_DURATION = 30; // second
 
+  private:
+
+    inline void set_new_config_root(web::json::value new_root) {
+      config_root_ = std::move(new_root);
+    }
+    /// trying to sync with the config root about principals, images, and objects
+    void sync() noexcept ;
+
+    void sync_principals();
+    void sync_images();
+    void sync_objects();
+    /// Only called for destruct
+    inline void terminate() {
+      terminate_ = false;
+    }
+
+
+    bool terminate_;
     std::string myip_;
     uint32_t local_port_lo_;
     uint32_t local_port_hi_;
@@ -163,7 +207,9 @@ class CoreManager {
     // the queue with on the fly syncing content
     std::vector< std::tuple<std::string, std::string, bool, web::json::value> > sync_q_;
     std::condition_variable sync_cond_;
+    std::unique_ptr<std::thread> sync_thread_;
     web::json::value config_root_; // root of json object that does sync
+    std::unique_ptr<SyscallProxy> proxy_; // Only do this for testing.
 };
 
 }

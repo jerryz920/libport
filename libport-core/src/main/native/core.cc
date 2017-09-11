@@ -8,6 +8,7 @@
 #include "principal.h"
 #include "accessor_object.h"
 #include "port_manager.h"
+#include "utils.h"
 
 #include <unordered_map>
 #include <sys/types.h>
@@ -65,10 +66,7 @@ std::string format_id(const std::string& ip, int lo, int hi) {
 }
 
 std::string format_principal_id(uint64_t pid) {
-  /// TODO: make this an utility
-  std::stringstream ss;
-  ss << std::hex << std::showbase << pid;
-  return ss.str();
+  return latte::utils::itoa<uint64_t, latte::utils::HexType>(pid);
 }
 
 std::string format_system_time() {
@@ -144,32 +142,74 @@ inline std::unique_ptr<O> make_unique(Args&&... args) {
   return std::unique_ptr<O>(new O(std::forward<Args>(args)...));
 }
 
+template <typename O, class T>
+inline std::unique_ptr<O> make_unique(T* pointer) {
+  return std::unique_ptr<O>(pointer);
+}
+
+class SyscallProxyImpl: public latte::SyscallProxy {
+  public:
+    int set_child_ports(pid_t pid, int lo, int hi) override {
+      return ::set_child_ports(pid, lo, hi);
+    }
+    int get_local_ports(int* lo, int *hi) override {
+      return ::get_local_ports(lo, hi);
+    }
+    int add_reserved_ports(int lo, int hi) override {
+      return ::add_reserved_ports(lo, hi);
+    }
+    int del_reserved_ports(int lo, int hi) override {
+      return ::del_reserved_ports(lo, hi);
+    }
+    int clear_reserved_ports() override {
+      return ::clear_reserved_ports();
+    }
+};
 
 }
 
 
 namespace latte {
-  /// Implementation of core manager
 
   CoreManager::CoreManager(const std::string& metadata_url, const std::string& myip,
-      const std::string& persistence_path):
+      const std::string& persistence_path, std::unique_ptr<SyscallProxy> proxy):
+    terminate_(false),
     myip_(std::move(myip)),
-    persistence_path_(persistence_path) {
+    persistence_path_(persistence_path),
+    proxy_(std::move(proxy)) {
     int lo, hi;
-    if (get_local_ports(&lo, &hi) != 0) {
+    if (proxy_->get_local_ports(&lo, &hi) != 0) {
       throw std::runtime_error("error fetching ip local ports");
     }
-    port_manager_ = std::unique_ptr<PortManager>(
-          new PortManager((uint32_t) lo, (uint32_t) hi));
+    port_manager_ = make_unique<PortManager>((uint32_t) lo, (uint32_t) hi);
+    /// TODO:
+    // Refactor this: metadata service client needs not be a concrete type, hard
+    // for testing and replacing
     client_ = make_unique<MetadataServiceClient>(metadata_url, format_id(myip_, lo, hi));
     config_root_[K_PRINCIPAL] = web::json::value::object();
     config_root_[K_IMAGE] = web::json::value::object();
     config_root_[K_ACCESSOR] = web::json::value::object();
   }
 
+  CoreManager::~CoreManager() {
+    {
+      std::lock_guard<std::mutex> guard(this->write_lock_);
+      terminate_ = true;
+      this->sync_cond_.notify_one();
+    }
+    if (this->sync_thread_) {
+      try {
+        this->sync_thread_->join();
+      } catch(std::system_error e) {
+        log_err("error quiting the sync thread: %s", e.what());
+      }
+    }
+  }
+
   CoreManager* CoreManager::from_disk(const std::string& fpath,
       const std::string& server_url, const std::string &myip) {
-    auto manager = new CoreManager(server_url, std::move(myip), fpath);
+    auto manager = new CoreManager(server_url, std::move(myip), fpath,
+        make_unique<SyscallProxyImpl>());
     std::string config_data = read_file(fpath);
     if (config_data == "") {
       log_err("not able to read config data, assume clean manager");
@@ -185,9 +225,22 @@ namespace latte {
     return manager;
   }
 
+  bool CoreManager::has_principal(uint64_t id) const {
+    return principals_.find(id) != principals_.cend();
+  }
+  bool CoreManager::has_principal_by_port(uint32_t port) const {
+    return port_manager_->is_allocated(port);
+  }
+  bool CoreManager::has_image(std::string& hash) const {
+    return images_.find(hash) != images_.end();
+  }
+  bool CoreManager::has_accessor(std::string& id) const {
+    return accessors_.find(id) != accessors_.end();
+  }
+
   void CoreManager::sync() noexcept {
     try {
-      ::clear_reserved_ports();
+      proxy_->clear_reserved_ports();
       sync_principals();
       sync_objects();
       sync_images();
@@ -228,12 +281,12 @@ namespace latte {
       auto p = Principal::from_json(std::move(i->second));
       auto exec_path = check_proc(p.id());
       if (exec_path == "") {
-        log_err("principal %llu is not running! Still syncing anyway\n", p.id());
+        log("process %llu is not running! Syncing anyway\n", p.id());
       }
       principals_.emplace(p.id(), make_unique<Principal>(std::move(p)));
       port_manager_->allocate(p.lo(), p.hi());
-      ::set_child_ports(p.id(), p.lo(), p.hi());
-      ::add_reserved_ports(p.lo(), p.hi());
+      proxy_->set_child_ports(p.id(), p.lo(), p.hi());
+      proxy_->add_reserved_ports(p.lo(), p.hi());
     }
   }
 
@@ -281,8 +334,8 @@ namespace latte {
 
       client_->post_new_principal(format_principal_id(id), 
           myip_, prange.first, prange.second, image_hash, configs);
-      ::set_child_ports((pid_t)id, prange.first, prange.second);
-      ::add_reserved_ports(prange.first, prange.second);
+      proxy_->set_child_ports((pid_t)id, prange.first, prange.second);
+      proxy_->add_reserved_ports(prange.first, prange.second);
       if (auto ref = tmp.lock()) {
         notify_created(K_PRINCIPAL, std::string(format_principal_id(id)),
             ref->to_json());
@@ -333,8 +386,7 @@ namespace latte {
       const std::string& endorsement) noexcept {
     try {
       if (images_.find(image_hash) == images_.cend()) {
-        log_err("Endorsing: can not find image %s", image_hash.c_str());
-        return -1;
+        log("Endorsing remote image: %s", image_hash.c_str());
       }
       client_->endorse_image(image_hash, endorsement);
     } catch(std::runtime_error) {
@@ -377,19 +429,19 @@ namespace latte {
     /// only delete principal and recycle the port at the moment
     auto record = principals_.find(uuid);
     if (record == principals_.cend()) {
-      log_err("trying to remove non-existed principal %llu\n", uuid);
+      log("removing non-existed or non-process principal %llu\n", uuid);
       /// trying to diagnose the process pid, to see if it exist and there
       // is any unsync.
       auto exec_name = check_proc(uuid);
       if (exec_name != "") {
-        latte::log_err("diagnose: pid %llu exist, executing %s, but not in principal map",
+        log("diagnose: pid %llu exist, executing %s, but not in principal map",
             uuid, exec_name.c_str());
       }
       return -1;
     }
     notify_deleted(K_PRINCIPAL, format_principal_id(uuid));
     port_manager_->deallocate(record->second->lo());
-    ::del_reserved_ports(record->second->lo(), record->second->hi());
+    proxy_->del_reserved_ports(record->second->lo(), record->second->hi());
     index_principals_.erase(record->second->lo());
     principals_.erase(record);
     return 0;
@@ -410,21 +462,38 @@ namespace latte {
   }
 
   void CoreManager::start_sync_thread() {
-    std::thread([this]() noexcept {
+
+    if (terminate_) {
+      log_err("trying to start sync thread at terminate phase, potential bug");
+      return;
+    }
+    log("starting latte sync thread for process %lu\n", getpid());
+    sync_thread_ = make_unique<std::thread>([this]() noexcept {
 
       while (true) {
         decltype(this->sync_q_) pending;
         {
+        /// We have to do this, because chrono::seconds require a reference, which
+        // make it a ODR-use, which in addition requires definition of SYNC_DURATION.
+        // We don't want the definition for real!
+          constexpr int duration = SYNC_DURATION;
           std::unique_lock<std::mutex> guard(this->write_lock_);
-          this->sync_cond_.wait_for(guard, std::chrono::seconds(SYNC_DURATION),
-              [this] { return this->sync_q_.size() > 0; });
+          this->sync_cond_.wait_for(guard, std::chrono::seconds(duration),
+              [this] { return this->sync_q_.size() > 0 || this->terminate_; });
+          // Quit the loop for terminate signal
+          if (this->terminate_) {
+            break;
+          }
           pending.swap(this->sync_q_);
         }
+        /// tuple[0] is the class type, principal, accessor, or images
         for (auto i = pending.begin(); i != pending.end(); i++) {
-          auto collection = this->config_root_[std::get<0>(*i)];
+          auto& collection = this->config_root_[std::get<0>(*i)];
           if (std::get<2>(*i)) { // true means insertion
+            printf("adding %s with %s\n", std::get<1>(*i).c_str(), std::get<3>(*i).serialize().c_str());
             collection[std::get<1>(*i)] = std::get<3>(*i);
           } else {
+            printf("deleting %s\n", std::get<1>(*i).c_str());
             collection.erase(std::get<1>(*i));
           }
         }
@@ -432,7 +501,7 @@ namespace latte {
         this->save(this->persistence_path_);
         pending.clear(); /// just for defensive if in case dctor makes some magic..
       }
-    }).detach();
+    });
   }
 
   void CoreManager::save(const std::string &fpath) noexcept {
@@ -463,13 +532,13 @@ int libport_init(const char *server_url, const char *persistence_path) {
       return -1;
     }
     if (!persistence_path || strcmp(persistence_path, "") == 0) {
-      core = std::unique_ptr<latte::CoreManager>(
-          new latte::CoreManager(server_url, std::move(myip),
-            make_default_restore_path(getpid())));
+      core = make_unique<latte::CoreManager>(server_url, std::move(myip),
+          make_default_restore_path(getpid()), make_unique<SyscallProxyImpl>());
     } else {
-      core = std::unique_ptr<latte::CoreManager>(
-          new latte::CoreManager(server_url, std::move(myip), persistence_path));
+      core = make_unique<latte::CoreManager>(server_url, std::move(myip),
+          persistence_path, make_unique<SyscallProxyImpl>());
     }
+    core->start_sync_thread();
   } catch (std::runtime_error) {
     return -1;
   }
@@ -485,6 +554,7 @@ int libport_reinit(const char *server_url, const char *persistence_path) {
     }
     core = std::unique_ptr<latte::CoreManager>(
         latte::CoreManager::from_disk(persistence_path, server_url, myip));
+    core->start_sync_thread();
   } catch (std::runtime_error) {
     return -1;
   }

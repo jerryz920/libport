@@ -159,8 +159,6 @@ class PortManager {
       if (index == allocated_.cbegin()) {
         // if index is the first, then as long as h > index.first it's overlapped
         /// order: l < index.first < index.second
-        std::printf("index %u %u, l, h %u %u\n", index->first, index->second,
-            l, h);
         return index->first < h;
       } else {
         auto index2 = std::prev(index);
@@ -170,10 +168,6 @@ class PortManager {
         //
         // In other word, if r <= index.first and index2.second <= l, then the
         // whole range of [l,r) is not yet allocated.
-        if (index != allocated_.cend()) {
-          std::printf("index %u %u\n", index->first, index->second);
-        }
-        std::printf("index2 %u %u, l, h %u %u\n", index2->first, index2->second, l, h);
         return index2 ->second > l || (index != allocated_.cend() && index->first < h);
       }
     }

@@ -178,7 +178,7 @@ void MetadataServiceClient::post_new_image(const std::string& image_hash,
         const std::string& source_url,
         const std::string& source_rev,
         const std::string& misc_conf) {
-  this->post_statement("/postAttesterImage", "", 
+  this->post_statement("/postAttesterImage", myid(), 
       {image_hash})
     .then(debug_task())
     .then([&](web::http::http_response res) -> 

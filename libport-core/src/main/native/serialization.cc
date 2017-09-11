@@ -4,57 +4,27 @@
 #include "image.h"
 #include "accessor_object.h"
 #include "cpprest/json.h"
+#include "utils.h"
 #include <ios>
 #include <string>
-#include <iomanip>
 
 namespace latte {
-
-typedef struct {} DecType;
-typedef struct {} HexType;
-typedef decltype(std::dec) ModeType;
-
-ModeType&& mode(DecType) {
-  return std::dec;
-}
-
-ModeType&& mode(HexType) {
-  return std::hex;
-}
-
-template<typename I, typename BaseType=DecType>
-std::string itoa(I&& i) {
-  std::stringstream ss;
-  ss.exceptions(std::stringstream::failbit);
-  ss << mode(BaseType()) << std::showbase << i;
-  return ss.str();
-}
-
-
-template<typename I>
-I atoi(const std::string& s) {
-  std::stringstream ss(s);
-  ss.exceptions(std::stringstream::failbit);
-  I result;
-  ss >> std::setbase(0) >> result;
-  return result;
-}
 
 Principal Principal::parse(const std::string &data) {
   return from_json(web::json::value::parse(data));
 }
 
 Principal Principal::from_json(web::json::value p) {
-  return Principal(atoi<uint64_t>(p["id"].as_string()),
-        atoi<int>(p["lo"].as_string()), atoi<int>(p["hi"].as_string()),
+  return Principal(utils::atoi<uint64_t>(p["id"].as_string()),
+        utils::atoi<int>(p["lo"].as_string()), utils::atoi<int>(p["hi"].as_string()),
         p["image"].as_string(), p["configs"].as_string());
 }
 
 web::json::value Principal::to_json() const {
   web::json::value v;
-  v["id"] = web::json::value::string(itoa<uint64_t, HexType>(this->id()));
-  v["lo"] = web::json::value::string(itoa(this->lo()));
-  v["hi"] = web::json::value::string(itoa(this->hi()));
+  v["id"] = web::json::value::string(utils::itoa<uint64_t, utils::HexType>(this->id()));
+  v["lo"] = web::json::value::string(utils::itoa(this->lo()));
+  v["hi"] = web::json::value::string(utils::itoa(this->hi()));
   v["image"] = web::json::value::string(this->image());
   v["configs"] = web::json::value::string(this->configs());
   return v;

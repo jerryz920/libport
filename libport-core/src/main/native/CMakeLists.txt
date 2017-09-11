@@ -22,7 +22,7 @@ set(Boost_ADDITIONAL_VERSIONS "1.54" "1.54.0")
 set(library_dependencies boost_system crypto ssl cpprest port)
 
 add_executable(test_port_manager test_port_manager.cc)
-target_include_directories(test_port_manager PRIVATE ${Boost_INCLUDE_DIRS})
+target_include_directories(test_port_manager PRIVATE ${Boost_INCLUDE_DIRS} test-include)
 # indicates the shared library variant
 target_compile_definitions(test_port_manager PRIVATE "BOOST_TEST_DYN_LINK=1")
 # indicates the link paths, which includes another path pointed library
@@ -32,13 +32,19 @@ add_test(NAME test_port_manager
 
 # TODO: is there a way to 
 add_executable(test_serialization test_serialization.cc)
-target_include_directories(test_serialization PRIVATE ${Boost_INCLUDE_DIRS})
+target_include_directories(test_serialization PRIVATE ${Boost_INCLUDE_DIRS} test-include)
 # indicates the shared library variant
 target_compile_definitions(test_serialization PRIVATE "BOOST_TEST_DYN_LINK=1")
 target_link_libraries(test_serialization ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${library_dependencies})
 add_test(NAME test_serialization
   COMMAND test_serialization)
 
+add_executable(test_core test_core.cc)
+target_include_directories(test_core PRIVATE ${Boost_INCLUDE_DIRS} test-include)
+target_compile_definitions(test_core PRIVATE "BOOST_TEST_DYN_LINK=1")
+target_link_libraries(test_core ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${library_dependencies})
+add_test(NAME test_core
+  COMMAND test_core)
 
 # metadata client test is a separate test with server side option, figure it out.
 add_executable(test_metadata test_metadata.cc)
