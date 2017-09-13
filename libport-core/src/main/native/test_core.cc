@@ -179,9 +179,9 @@ BOOST_AUTO_TEST_CASE(test_send_sync) {
   // structure... But we won't need new things here to ensure a "test"
   // to be perfect correct.
   auto config_root = m.obtain_root();
-  auto& ps = config_root["principals"];
-  auto& is = config_root["images"];
-  auto& os = config_root["accessors"];
+  auto ps = config_root["principals"];
+  auto is = config_root["images"];
+  auto os = config_root["accessors"];
   BOOST_CHECK_EQUAL(ps.as_object().size(), 1);
   BOOST_CHECK_EQUAL(is.as_object().size(), 1);
   BOOST_CHECK_EQUAL(os.as_object().size(), 1);
@@ -206,7 +206,7 @@ BOOST_AUTO_TEST_CASE(test_principal) {
   }
   std::this_thread::sleep_for(std::chrono::seconds(1));
   auto config_root = m.obtain_root();
-  auto& ps = config_root["principals"];
+  auto ps = config_root["principals"];
   BOOST_CHECK_EQUAL(ps.as_object().size(), 5);
   for (int i = 0; i < 5; i++) {
     BOOST_CHECK(m.has_principal(i));
@@ -239,8 +239,8 @@ BOOST_AUTO_TEST_CASE(test_principal) {
   }
   /// it's returned by value so we need to obtain it again
   config_root = m.obtain_root();
-  auto& ps1 = config_root["principals"];
-  BOOST_CHECK_EQUAL(ps1.as_object().size(), 2);
+  ps = config_root["principals"];
+  BOOST_CHECK_EQUAL(ps.as_object().size(), 2);
 }
 
 BOOST_AUTO_TEST_CASE(test_image) {
@@ -258,7 +258,7 @@ BOOST_AUTO_TEST_CASE(test_image) {
   }
   std::this_thread::sleep_for(std::chrono::seconds(1));
   auto config_root = m.obtain_root();
-  auto& ps = config_root["images"];
+  auto ps = config_root["images"];
   BOOST_CHECK_EQUAL(ps.as_object().size(), 5);
   for (int i = 0; i < 5; i++) {
     std::stringstream ss1;
@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE(test_object) {
   }
   std::this_thread::sleep_for(std::chrono::seconds(1));
   auto config_root = m.obtain_root();
-  auto& ps = config_root["accessors"];
+  auto ps = config_root["accessors"];
   BOOST_CHECK_EQUAL(ps.as_object().size(), 5);
   BOOST_CHECK_EQUAL(ps["obj1"]["acls"].as_array().size(), 1);
   for (int i = 0; i < 5; i++) {
