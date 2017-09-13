@@ -48,7 +48,8 @@ extern "C" {
 //   args:
 //    * metadata_host: IP address or host name
 //    * metadata_service: port address of metadata service
-int libport_init(const char *server_url);
+int libport_init(const char *server_url, const char *persistence_path);
+int libport_reinit(const char *server_url, const char *persistence_path);
 
 
 int create_principal(uint64_t uuid, const char *image, const char *string, int nport);

@@ -12,7 +12,7 @@ find_library(CPPREST cpprest)
 find_library(SSL ssl)
 find_library(CRYPTO crypto)
 
-add_library(port core.cc log.cc metadata.cc serialization.cc)
+add_library(port core.cc log.cc metadata.cc serialization.cc utils.cc)
 include_directories("${PROJECT_SOURCE_DIR}/include")
 include_directories(SYSTEM "/usr/local/include")
 

@@ -36,6 +36,13 @@
 
 #include <sstream>
 #include <iomanip>
+#include <memory>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include "log.h"
 
 namespace latte {
   namespace utils {
@@ -69,6 +76,20 @@ inline I atoi(const std::string& s) {
   ss >> std::setbase(0) >> result;
   return result;
 }
+
+template <typename O, class... Args>
+inline std::unique_ptr<O> make_unique(Args&&... args) {
+  return std::unique_ptr<O>(new O(std::forward<Args>(args)...));
+}
+
+template <typename O, class T>
+inline std::unique_ptr<O> make_unique(T* pointer) {
+  return std::unique_ptr<O>(pointer);
+}
+
+std::string read_file(const std::string& fpath);
+
+
 
 }
 

@@ -10,6 +10,7 @@
 #include "utils.h"
 
 #include <chrono>
+#include "cpprest/json.h"
 
 #define BOOST_TEST_MODULE TestCore
 #include <boost/test/unit_test.hpp>
@@ -50,6 +51,7 @@ class MockMetadataClient: public MetadataServiceClient {
 };
 
 class MockSyscallProxy :public SyscallProxy {
+  public:
   int64_t CALL_COUNT(get_local_ports) = 0;
   int RETURN_VALUE(get_local_ports) = 0; 
   typedef std::tuple< 
@@ -79,6 +81,7 @@ class MockCoreManager: public CoreManager {
   MockCoreManager(const std::string& metadata_url, const std::string& myip,
         const std::string& persistence_path, std::unique_ptr<SyscallProxy> s):
     CoreManager(metadata_url, myip, persistence_path, std::move(s)) {
+      set_metadata_client(std::unique_ptr<MetadataServiceClient>(new MockMetadataClient));
 
     }
   void notify_created(std::string&& type, std::string&& key,
@@ -120,6 +123,18 @@ class MockCoreManager: public CoreManager {
     return CoreManager::get_config_root();
   }
 
+  MockMetadataClient* get_mock_metadata_client() {
+    return dynamic_cast<MockMetadataClient*>(CoreManager::get_metadata_client());
+  }
+
+  void set_new_config_root(web::json::value new_root) {
+    CoreManager::set_new_config_root(new_root);
+  }
+
+  void sync() noexcept {
+    CoreManager::sync();
+  }
+
 };
 
 
@@ -133,7 +148,7 @@ BOOST_AUTO_TEST_CASE(test_init) {
 
 BOOST_AUTO_TEST_CASE(test_send_sync) {
   MockCoreManager m ("http://localhost:10011", "192.168.0.1",
-      "/tmp/libport-test-core-manager.json",
+      "/tmp/libport-test-core-manager-send-sync.json",
       std::unique_ptr<SyscallProxy>(new MockSyscallProxy));
   m.start_sync_thread();
 
@@ -178,19 +193,184 @@ BOOST_AUTO_TEST_CASE(test_send_sync) {
   BOOST_CHECK_EQUAL(os["o2"]["name"].as_string(), "o2");
 }
 
-BOOST_AUTO_TEST_CASE(test_create_principal) {
+BOOST_AUTO_TEST_CASE(test_principal) {
+  MockCoreManager m ("http://localhost:10011", "192.168.0.1",
+      "/tmp/libport-test-core-manager-create-principal.json",
+      std::unique_ptr<SyscallProxy>(new MockSyscallProxy));
+  m.start_sync_thread();
+  for (int i = 0; i < 5; i++) {
+    std::stringstream ss, ss1;
+    ss << "image" << i;
+    ss1 << "config" << i;
+    BOOST_CHECK_EQUAL(m.create_principal(i, ss.str(), ss1.str(), 10), 0);
+  }
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+  auto config_root = m.obtain_root();
+  auto& ps = config_root["principals"];
+  BOOST_CHECK_EQUAL(ps.as_object().size(), 5);
+  for (int i = 0; i < 5; i++) {
+    BOOST_CHECK(m.has_principal(i));
+  }
+  auto* mock_client = m.get_mock_metadata_client();
+  BOOST_CHECK_EQUAL(mock_client->post_new_principal_call_count, 5);
+  int i = 0;
+  for (auto it = mock_client->post_new_principal_call_args.begin();
+      it != mock_client->post_new_principal_call_args.end(); ++it) {
+    std::stringstream ss, ss1;
+    ss << "image" << i;
+    ss1 << "config" << i;
+    auto stri = latte::utils::itoa<int, latte::utils::HexType>(i);
+    BOOST_CHECK_EQUAL(std::get<0>(*it), stri);
+    BOOST_CHECK_EQUAL(std::get<1>(*it), "192.168.0.1");
+    BOOST_CHECK_EQUAL(std::get<4>(*it), ss.str());
+    BOOST_CHECK_EQUAL(std::get<5>(*it), ss1.str());
+    i++;
+  }
+
+  m.delete_principal(1);
+  m.delete_principal(2);
+  m.delete_principal(0);
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+  BOOST_CHECK(!m.has_principal(0));
+  BOOST_CHECK(!m.has_principal(1));
+  BOOST_CHECK(!m.has_principal(2));
+  for (int i = 3; i < 5; i++) {
+    BOOST_CHECK(m.has_principal(i));
+  }
+  /// it's returned by value so we need to obtain it again
+  config_root = m.obtain_root();
+  auto& ps1 = config_root["principals"];
+  BOOST_CHECK_EQUAL(ps1.as_object().size(), 2);
 }
 
-BOOST_AUTO_TEST_CASE(test_delete_principal) {
+BOOST_AUTO_TEST_CASE(test_image) {
+  MockCoreManager m ("http://localhost:10011", "192.168.0.1",
+      "/tmp/libport-test-core-manager-image.json",
+      std::unique_ptr<SyscallProxy>(new MockSyscallProxy));
+  m.start_sync_thread();
+  for (int i = 0; i < 5; i++) {
+    std::stringstream ss1, ss2, ss3, ss4;
+    ss1 << "hash" << i;
+    ss2 << "url" << i;
+    ss3 << "rev" << i;
+    ss4 << "config" << i;
+    BOOST_CHECK_EQUAL(m.create_image(ss1.str(), ss2.str(), ss3.str(), ss4.str()), 0);
+  }
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+  auto config_root = m.obtain_root();
+  auto& ps = config_root["images"];
+  BOOST_CHECK_EQUAL(ps.as_object().size(), 5);
+  for (int i = 0; i < 5; i++) {
+    std::stringstream ss1;
+    ss1 << "hash" << i;
+    BOOST_CHECK(m.has_image(ss1.str()));
+  }
+  auto* mock_client = m.get_mock_metadata_client();
+  BOOST_CHECK_EQUAL(mock_client->post_new_image_call_count, 5);
+  int i = 0;
+  for (auto it = mock_client->post_new_image_call_args.begin();
+      it != mock_client->post_new_image_call_args.end(); ++it) {
+    std::stringstream ss1, ss2, ss3, ss4;
+    ss1 << "hash" << i;
+    ss2 << "url" << i;
+    ss3 << "rev" << i;
+    ss4 << "config" << i;
+    BOOST_CHECK_EQUAL(std::get<0>(*it), ss1.str());
+    BOOST_CHECK_EQUAL(std::get<1>(*it), ss2.str());
+    BOOST_CHECK_EQUAL(std::get<2>(*it), ss3.str());
+    BOOST_CHECK_EQUAL(std::get<3>(*it), ss4.str());
+    i++;
+  }
+
 }
 
-BOOST_AUTO_TEST_CASE(test_create_image) {
-}
+BOOST_AUTO_TEST_CASE(test_object) {
+  MockCoreManager m ("http://localhost:10011", "192.168.0.1",
+      "/tmp/libport-test-core-manager-object.json",
+      std::unique_ptr<SyscallProxy>(new MockSyscallProxy));
+  m.start_sync_thread();
+  for (int i = 0; i < 5; i++) {
+    std::stringstream ss1;
+    ss1 << "obj" << i;
+    for (int j = 0; j < 5; j++) {
+      BOOST_CHECK_EQUAL(m.post_object_acl(ss1.str(), "acl"), 0);
+    }
+  }
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+  auto config_root = m.obtain_root();
+  auto& ps = config_root["accessors"];
+  BOOST_CHECK_EQUAL(ps.as_object().size(), 5);
+  BOOST_CHECK_EQUAL(ps["obj1"]["acls"].as_array().size(), 1);
+  for (int i = 0; i < 5; i++) {
+    std::stringstream ss1;
+    ss1 << "obj" << i;
+    BOOST_CHECK(m.has_accessor(ss1.str()));
+  }
 
-BOOST_AUTO_TEST_CASE(test_endorse_image) {
+  auto* mock_client = m.get_mock_metadata_client();
+  BOOST_CHECK_EQUAL(mock_client->post_object_acl_call_count, 25);
+  int i = 0;
+  for (auto it = mock_client->post_object_acl_call_args.begin();
+      it != mock_client->post_object_acl_call_args.end(); ++it) {
+    std::stringstream ss1;
+    ss1 << "obj" << i / 5;
+    BOOST_CHECK_EQUAL(std::get<0>(*it), ss1.str());
+    BOOST_CHECK_EQUAL(std::get<1>(*it), "acl");
+    i++;
+  }
+
 }
 
 BOOST_AUTO_TEST_CASE(test_recover) {
+  std::string config_data = utils::read_file("../data/config-root.json");
+  auto root = web::json::value::parse(config_data);
+  auto mock_syscall_proxy = utils::make_unique<MockSyscallProxy>();
+  const auto observer = mock_syscall_proxy.get();
+  auto manager = utils::make_unique<MockCoreManager>("http://localhost:10011", 
+      "192.168.0.1", "/tmp/libport-test-recover.json",
+      std::move(mock_syscall_proxy));
+  manager->set_new_config_root(root);
+  manager->sync();
+
+  BOOST_CHECK(manager->has_principal(3));
+  BOOST_CHECK(manager->has_principal(4));
+  BOOST_CHECK(manager->has_image("hash1"));
+  BOOST_CHECK(manager->has_image("hash2"));
+  BOOST_CHECK(manager->has_image("hash3"));
+  BOOST_CHECK(manager->has_image("hash4"));
+  BOOST_CHECK(manager->has_image("hash0"));
+  BOOST_CHECK(manager->has_accessor("obj1"));
+  BOOST_CHECK(manager->has_accessor("obj2"));
+  BOOST_CHECK(manager->has_accessor("obj3"));
+  BOOST_CHECK(manager->has_accessor("obj4"));
+  BOOST_CHECK(manager->has_accessor("obj0"));
+  BOOST_CHECK_EQUAL(observer->set_child_ports_call_count, 2);
+  BOOST_CHECK_EQUAL(observer->add_reserved_ports_call_count, 2);
+  int i = 0;
+  for (auto it = observer->set_child_ports_call_args.cbegin();
+      it != observer->set_child_ports_call_args.cend(); ++it, ++i) {
+
+    if (std::get<0>(*it) == 3) {
+      BOOST_CHECK_EQUAL(std::get<1>(*it), 65495);
+      BOOST_CHECK_EQUAL(std::get<2>(*it), 65505);
+    } else if (std::get<0>(*it) == 4) {
+      BOOST_CHECK_EQUAL(std::get<1>(*it), 65485);
+      BOOST_CHECK_EQUAL(std::get<2>(*it), 65495);
+    } else {
+      BOOST_FAIL("no such ID in test");
+    }
+  }
+  for (auto it = observer->add_reserved_ports_call_args.cbegin();
+      it != observer->add_reserved_ports_call_args.cend(); ++it, ++i) {
+
+    if (std::get<0>(*it) == 65495) {
+      BOOST_CHECK_EQUAL(std::get<1>(*it), 65505);
+    } else if (std::get<0>(*it) == 65485) {
+      BOOST_CHECK_EQUAL(std::get<1>(*it), 65495);
+    } else {
+      BOOST_FAIL("no such port in test");
+    }
+  }
 }
 
 }

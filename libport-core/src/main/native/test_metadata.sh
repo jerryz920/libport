@@ -6,9 +6,10 @@ if [ $# -ne 1 ]; then
 fi
 
 go build $1/metadata_stub.go
+sleep 0.5
 ./metadata_stub &
 p=$!
-sleep 1.5
+sleep 1.0
 ./test_metadata
 if [ $? ]; then
   echo passed

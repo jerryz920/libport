@@ -23,6 +23,8 @@
 #include <fstream>
 #include <thread>
 #include <chrono>
+
+
 using std::unordered_map;
 
 
@@ -112,39 +114,11 @@ std::string check_proc(uint64_t pid) {
   return result;
 }
 
-std::string read_file(const std::string& fpath) {
-  struct stat s;
-  /// We use c style but we should be good
-  if (stat(fpath.c_str(), &s) < 0) {
-    latte::log_err("read file %s, lstat: %s", fpath.c_str(), strerror(errno));
-    return "";
-  }
-  std::FILE* f = fopen(fpath.c_str(), "r");
-  if (f) {
-    std::string result(s.st_size, ' ');
-    std::fread(&result[0], s.st_size, 1, f);
-    std::fclose(f);
-    return result;
-  } else {
-    latte::log_err("read file %s, open: %s", fpath.c_str(), strerror(errno));
-    return "";
-  }
-}
 
 std::string make_default_restore_path(pid_t p) {
   std::stringstream ss;
   ss << "/var/run/libport/conf-" << p << ".json";
   return ss.str();
-}
-
-template <typename O, class... Args>
-inline std::unique_ptr<O> make_unique(Args&&... args) {
-  return std::unique_ptr<O>(new O(std::forward<Args>(args)...));
-}
-
-template <typename O, class T>
-inline std::unique_ptr<O> make_unique(T* pointer) {
-  return std::unique_ptr<O>(pointer);
 }
 
 class SyscallProxyImpl: public latte::SyscallProxy {
@@ -181,11 +155,12 @@ namespace latte {
     if (proxy_->get_local_ports(&lo, &hi) != 0) {
       throw std::runtime_error("error fetching ip local ports");
     }
-    port_manager_ = make_unique<PortManager>((uint32_t) lo, (uint32_t) hi);
+    port_manager_ = utils::make_unique<PortManager>((uint32_t) lo, (uint32_t) hi);
     /// TODO:
     // Refactor this: metadata service client needs not be a concrete type, hard
     // for testing and replacing
-    client_ = make_unique<MetadataServiceClient>(metadata_url, format_id(myip_, lo, hi));
+    client_ = utils::make_unique<MetadataServiceClient>(
+        metadata_url, format_id(myip_, lo, hi));
     config_root_[K_PRINCIPAL] = web::json::value::object();
     config_root_[K_IMAGE] = web::json::value::object();
     config_root_[K_ACCESSOR] = web::json::value::object();
@@ -194,7 +169,7 @@ namespace latte {
   CoreManager::~CoreManager() {
     {
       std::lock_guard<std::mutex> guard(this->write_lock_);
-      terminate_ = true;
+      terminate();
       this->sync_cond_.notify_one();
     }
     if (this->sync_thread_) {
@@ -206,11 +181,11 @@ namespace latte {
     }
   }
 
-  CoreManager* CoreManager::from_disk(const std::string& fpath,
+  std::unique_ptr<CoreManager> CoreManager::from_disk(const std::string& fpath,
       const std::string& server_url, const std::string &myip) {
-    auto manager = new CoreManager(server_url, std::move(myip), fpath,
-        make_unique<SyscallProxyImpl>());
-    std::string config_data = read_file(fpath);
+    auto manager = utils::make_unique<CoreManager>(server_url, std::move(myip), fpath,
+        utils::make_unique<SyscallProxyImpl>());
+    std::string config_data = utils::read_file(fpath);
     if (config_data == "") {
       log_err("not able to read config data, assume clean manager");
       return manager;
@@ -231,10 +206,10 @@ namespace latte {
   bool CoreManager::has_principal_by_port(uint32_t port) const {
     return port_manager_->is_allocated(port);
   }
-  bool CoreManager::has_image(std::string& hash) const {
+  bool CoreManager::has_image(std::string hash) const {
     return images_.find(hash) != images_.end();
   }
-  bool CoreManager::has_accessor(std::string& id) const {
+  bool CoreManager::has_accessor(std::string id) const {
     return accessors_.find(id) != accessors_.end();
   }
 
@@ -260,7 +235,7 @@ namespace latte {
     for (auto i = objs.begin(); i != objs.end(); ++i) {
       auto obj = AccessorObject::from_json(std::move(i->second));
       std::string name(obj.name());
-      accessors_.emplace(name, make_unique<AccessorObject>(std::move(obj)));
+      accessors_.emplace(name, utils::make_unique<AccessorObject>(std::move(obj)));
     }
   }
 
@@ -270,7 +245,7 @@ namespace latte {
     for (auto i = images.begin(); i != images.end(); ++i) {
       auto image = Image::from_json(std::move(i->second));
       std::string name(image.hash());
-      images_.emplace(name, make_unique<Image>(std::move(image)));
+      images_.emplace(name, utils::make_unique<Image>(std::move(image)));
     }
   }
 
@@ -283,7 +258,7 @@ namespace latte {
       if (exec_path == "") {
         log("process %llu is not running! Syncing anyway\n", p.id());
       }
-      principals_.emplace(p.id(), make_unique<Principal>(std::move(p)));
+      principals_.emplace(p.id(), utils::make_unique<Principal>(std::move(p)));
       port_manager_->allocate(p.lo(), p.hi());
       proxy_->set_child_ports(p.id(), p.lo(), p.hi());
       proxy_->add_reserved_ports(p.lo(), p.hi());
@@ -297,7 +272,7 @@ namespace latte {
       const std::string& misc_conf
       ) noexcept {
     auto location = images_.emplace(image_hash,
-        make_unique<Image>(image_hash, source_url, source_rev, misc_conf));
+        utils::make_unique<Image>(image_hash, source_url, source_rev, misc_conf));
 
     try {
       client_->post_new_image(image_hash, source_url, source_rev, misc_conf);
@@ -363,7 +338,7 @@ namespace latte {
       const std::string& requirement) noexcept {
     try {
       const auto insert_res = accessors_.emplace(obj_id,
-          make_unique<AccessorObject>(obj_id));
+          utils::make_unique<AccessorObject>(obj_id));
       const auto& obj_ptr = insert_res.first->second;
       obj_ptr->add_acl(requirement);
       client_->post_object_acl(obj_id, requirement);
@@ -468,7 +443,7 @@ namespace latte {
       return;
     }
     log("starting latte sync thread for process %lu\n", getpid());
-    sync_thread_ = make_unique<std::thread>([this]() noexcept {
+    sync_thread_ = utils::make_unique<std::thread>([this]() noexcept {
 
       while (true) {
         decltype(this->sync_q_) pending;
@@ -520,11 +495,20 @@ namespace latte {
 }
 
 
-static std::unique_ptr<latte::CoreManager> core;
+static std::unique_ptr<latte::CoreManager> core = nullptr;
 
-// A list of principals, images and objects maintaned by this library
+static void clear_stall_state() {
+  if (core) {
+    core->clear_stall_state();
+    core.reset(nullptr);
+  }
+}
 
+
+// This must be called if a process intends to become an attester. It will
+// clear stalled information (if any)
 int libport_init(const char *server_url, const char *persistence_path) {
+  clear_stall_state();
   try {
     std::string myip = get_myip();
     if (myip.compare("") == 0) {
@@ -532,11 +516,12 @@ int libport_init(const char *server_url, const char *persistence_path) {
       return -1;
     }
     if (!persistence_path || strcmp(persistence_path, "") == 0) {
-      core = make_unique<latte::CoreManager>(server_url, std::move(myip),
-          make_default_restore_path(getpid()), make_unique<SyscallProxyImpl>());
+      core = latte::utils::make_unique<latte::CoreManager>(server_url, std::move(myip),
+          make_default_restore_path(getpid()),
+          latte::utils::make_unique<SyscallProxyImpl>());
     } else {
-      core = make_unique<latte::CoreManager>(server_url, std::move(myip),
-          persistence_path, make_unique<SyscallProxyImpl>());
+      core = latte::utils::make_unique<latte::CoreManager>(server_url, std::move(myip),
+          persistence_path, latte::utils::make_unique<SyscallProxyImpl>());
     }
     core->start_sync_thread();
   } catch (std::runtime_error) {
@@ -546,14 +531,14 @@ int libport_init(const char *server_url, const char *persistence_path) {
 }
 
 int libport_reinit(const char *server_url, const char *persistence_path) {
+  clear_stall_state();
   try {
     std::string myip = get_myip();
     if (myip.compare("") == 0) {
       latte::log_err("failed to initialize libport principal identity");
       return -1;
     }
-    core = std::unique_ptr<latte::CoreManager>(
-        latte::CoreManager::from_disk(persistence_path, server_url, myip));
+    core = latte::CoreManager::from_disk(persistence_path, server_url, myip);
     core->start_sync_thread();
   } catch (std::runtime_error) {
     return -1;

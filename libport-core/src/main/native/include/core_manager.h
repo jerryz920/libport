@@ -55,6 +55,7 @@ class PortManager;
 class SyscallProxy {
   public:
     SyscallProxy() {}
+    virtual ~SyscallProxy() {}
     virtual int set_child_ports(pid_t pid, int lo, int hi) = 0;
     virtual int get_local_ports(int* lo, int *hi) = 0;
     virtual int add_reserved_ports(int lo, int hi) = 0;
@@ -65,7 +66,6 @@ class SyscallProxy {
 class CoreManager {
 
   public:
-    CoreManager() = delete;
     CoreManager(const CoreManager& other) = delete;
     CoreManager& operator =(const CoreManager& other) = delete;
     CoreManager(CoreManager&& other):
@@ -103,8 +103,11 @@ class CoreManager {
 
     CoreManager(const std::string& metadata_url, const std::string& myip,
         const std::string& persistence_path, std::unique_ptr<SyscallProxy> s);
-    ~CoreManager();
+    virtual ~CoreManager();
 
+    void clear_stall_state() {
+      sync_thread_ = nullptr;
+    }
 
 
     /// operations, we may want to use this as "build_image"
@@ -133,7 +136,7 @@ class CoreManager {
     int delete_principal(uint64_t uuid) noexcept;
 
     void save(const std::string& fpath) noexcept;
-    static CoreManager* from_disk(const std::string& fpath,
+    static std::unique_ptr<CoreManager> from_disk(const std::string& fpath,
         const std::string &server_url, const std::string &myip);
 
 
@@ -149,11 +152,12 @@ class CoreManager {
     /// peeking the internal state
     bool has_principal(uint64_t id) const;
     bool has_principal_by_port(uint32_t port) const;
-    bool has_image(std::string& hash) const;
-    bool has_accessor(std::string& id) const;
+    bool has_image(std::string hash) const;
+    bool has_accessor(std::string id) const;
 
   protected:
     /// Methods only intended for testing
+    CoreManager() {}
     inline void set_metadata_client(std::unique_ptr<MetadataServiceClient> c) {
       client_.swap(c);
     }
@@ -161,13 +165,21 @@ class CoreManager {
     inline web::json::value get_config_root() {
       return config_root_;
     }
+    inline MetadataServiceClient* get_metadata_client() {
+      return client_.get();
+    }
 
     inline void set_syscall_proxy(std::unique_ptr<SyscallProxy> s) {
       proxy_.swap(s);
     }
 
+    inline void set_new_config_root(web::json::value new_root) {
+      config_root_ = std::move(new_root);
+    }
+
     void notify_created(std::string&& type, std::string&& key, web::json::value v);
     void notify_deleted(std::string&& type, std::string&& key);
+    void sync() noexcept ;
 
     /// access key in the config root of json
     constexpr static const char* K_PRINCIPAL = "principals";
@@ -176,19 +188,14 @@ class CoreManager {
     constexpr static const int SYNC_DURATION = 30; // second
 
   private:
-
-    inline void set_new_config_root(web::json::value new_root) {
-      config_root_ = std::move(new_root);
-    }
     /// trying to sync with the config root about principals, images, and objects
-    void sync() noexcept ;
 
     void sync_principals();
     void sync_images();
     void sync_objects();
     /// Only called for destruct
     inline void terminate() {
-      terminate_ = false;
+      terminate_ = true;
     }
 
 

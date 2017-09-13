@@ -46,11 +46,15 @@ class MetadataServiceDebugger;
 
 class MetadataServiceClient {
 
+  protected:
+    // Test use only
+    MetadataServiceClient() {}
+
   public:
-    MetadataServiceClient() = delete;
     MetadataServiceClient(const MetadataServiceClient&) = delete;
     MetadataServiceClient& operator =(const MetadataServiceClient&) = delete;
     MetadataServiceClient(const std::string &server_url, const std::string& myid);
+    virtual ~MetadataServiceClient() {}
 
 
     /// the byte array is just 
@@ -95,7 +99,7 @@ class MetadataServiceClient {
         const std::string& target,
         const std::vector<std::string>& statements);
 
-    web::http::client::http_client client_;
+    std::unique_ptr<web::http::client::http_client> client_;
     std::string myid_;
 
     /// just for test purpose

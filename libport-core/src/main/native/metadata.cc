@@ -37,6 +37,7 @@
 #include "metadata.h"
 #include "cpprest/http_client.h"
 #include "cpprest/json.h"
+#include "utils.h"
 #include <iostream>
 
 
@@ -137,12 +138,12 @@ pplx::task<web::http::http_response> MetadataServiceClient::post_statement(
   new_request.set_request_uri(api_path);
   new_request.headers().set_content_type("application/json");
   new_request.set_body(format_request(speaker, statements));
-  return this->client_.request(new_request);
+  return this->client_->request(new_request);
 }
 
 MetadataServiceClient::MetadataServiceClient(const std::string &server_url,
     const std::string& myid):
-  client_(server_url),
+  client_(utils::make_unique<web::http::client::http_client>(server_url)),
   myid_(myid) {
   }
 

@@ -109,13 +109,16 @@ class PortManager {
       if (allocate_index == allocated_.end()) {
         throw_bad_port(p);
       }
-      auto free_index = free_map_.lower_bound(p);
+      auto free_index = free_map_.upper_bound(p);
+      auto value = free_index->first;
       /// merge right
       if (free_index != free_map_.end()) {
         auto right_index = free_index;
         if (right_index->first == allocate_index->second) {
           allocate_index->second = right_index->second;
           free_map_.erase(right_index);
+          /// internal structure changed, we may need to reset it!
+          free_index = free_map_.find(value);
         }
       }
       if (free_index != free_map_.begin()) {
