@@ -6,6 +6,6 @@ git clone -b dev https://github.com/jerryz920/cpprestsdk.git casablanca
 cd casablanca/Release
 mkdir -p build.release && cd build.release
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j
+make -j 4 # be gentle...
 make install
 
