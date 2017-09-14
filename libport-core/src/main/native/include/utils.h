@@ -88,6 +88,7 @@ inline std::unique_ptr<O> make_unique(T* pointer) {
 }
 
 std::string read_file(const std::string& fpath);
+std::string get_myip();
 
 
 

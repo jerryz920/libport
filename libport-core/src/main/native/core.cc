@@ -9,14 +9,12 @@
 #include "accessor_object.h"
 #include "port_manager.h"
 #include "utils.h"
+#include "pplx/threadpool.h"
 
 #include <unordered_map>
 #include <sys/types.h>
 #include <unistd.h>
-#include <ifaddrs.h>
 #include <cstring>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <errno.h>
 #include <cstdlib>
 #include <sstream>
@@ -31,35 +29,7 @@ using std::unordered_map;
 /// Singleton instance of library storage
 
 namespace {
-std::string get_myip() {
 
-  struct ifaddrs *addrs;
-  if (getifaddrs(&addrs)) {
-    throw std::runtime_error(strerror(errno));
-  }
-
-  for (struct ifaddrs *cur = addrs; cur != NULL; cur = cur->ifa_next) {
-    /// filter the loopback interface
-    if (strcmp(cur->ifa_name, "lo") == 0) {
-      continue;
-    }
-    /// We don't use IPv6 at the moment
-    if (cur->ifa_addr->sa_family != AF_INET) {
-      continue;
-    }
-    /// format IP
-    char ipbuf[INET_ADDRSTRLEN + 1];
-    if (!inet_ntop(AF_INET, &((struct sockaddr_in*)cur->ifa_addr)->sin_addr,
-        ipbuf, INET_ADDRSTRLEN)) {
-      return std::string(ipbuf);
-    } else {
-      freeifaddrs(addrs);
-      throw std::runtime_error(strerror(errno));
-    }
-  }
-  freeifaddrs(addrs);
-  return "";
-}
 
 std::string format_id(const std::string& ip, int lo, int hi) {
   std::stringstream ss;
@@ -123,6 +93,24 @@ std::string make_default_restore_path(pid_t p) {
 
 class SyscallProxyImpl: public latte::SyscallProxy {
   public:
+    SyscallProxyImpl() {
+      /// system usually reserves 32768-60000 ports to process as client.
+      // Then if we update the port manager to 0-65535 then sometimes the set_local_port
+      // does not work as expected. Instead, we read out the available local ports and
+      // match it against get_child_ports
+      int lo, hi;
+      ::get_local_ports(&lo, &hi);
+
+      int syslo, syshi;
+      get_system_local_ports(&syslo, &syshi);
+
+      if (lo < syslo || hi > syshi) {
+        if (lo < syslo) lo = syslo;
+        if (hi > syshi) hi = syshi;
+        ::set_local_ports(lo, hi);
+      }
+    }
+
     int set_child_ports(pid_t pid, int lo, int hi) override {
       return ::set_child_ports(pid, lo, hi);
     }
@@ -138,6 +126,11 @@ class SyscallProxyImpl: public latte::SyscallProxy {
     int clear_reserved_ports() override {
       return ::clear_reserved_ports();
     }
+
+    void get_system_local_ports(int *lo, int *hi) {
+      std::ifstream f("/proc/sys/net/ipv4/ip_local_port_range");
+      f >> *lo >> *hi;
+    }
 };
 
 }
@@ -149,36 +142,43 @@ namespace latte {
       const std::string& persistence_path, std::unique_ptr<SyscallProxy> proxy):
     terminate_(false),
     myip_(std::move(myip)),
+    server_url_(metadata_url),
     persistence_path_(persistence_path),
+    write_lock_(utils::make_unique<std::mutex>()),
     proxy_(std::move(proxy)) {
-    int lo, hi;
-    if (proxy_->get_local_ports(&lo, &hi) != 0) {
-      throw std::runtime_error("error fetching ip local ports");
-    }
-    port_manager_ = utils::make_unique<PortManager>((uint32_t) lo, (uint32_t) hi);
-    /// TODO:
-    // Refactor this: metadata service client needs not be a concrete type, hard
-    // for testing and replacing
-    client_ = utils::make_unique<MetadataServiceClient>(
-        metadata_url, format_id(myip_, lo, hi));
-    config_root_[K_PRINCIPAL] = web::json::value::object();
-    config_root_[K_IMAGE] = web::json::value::object();
-    config_root_[K_ACCESSOR] = web::json::value::object();
+
+      if (proxy_->get_local_ports(&lo_, &hi_) != 0) {
+        throw std::runtime_error("error fetching ip local ports");
+      }
+      port_manager_ = utils::make_unique<PortManager>((uint32_t) lo_, (uint32_t) hi_);
+      /// TODO:
+      // Refactor this: metadata service client needs not be a concrete type, hard
+      // for testing and replacing
+      client_ = utils::make_unique<MetadataServiceClient>(
+          metadata_url, format_id(myip_, lo_, hi_));
+      config_root_[K_PRINCIPAL] = web::json::value::object();
+      config_root_[K_IMAGE] = web::json::value::object();
+      config_root_[K_ACCESSOR] = web::json::value::object();
   }
 
   CoreManager::~CoreManager() {
-    {
-      std::lock_guard<std::mutex> guard(this->write_lock_);
+    /// FIXME: do we need any sort of memory barrier?
+    if (!terminate_) {
       terminate();
-      this->sync_cond_.notify_one();
     }
     if (this->sync_thread_) {
       try {
         this->sync_thread_->join();
-      } catch(std::system_error e) {
+      } catch(const std::system_error& e) {
         log_err("error quiting the sync thread: %s", e.what());
       }
     }
+  }
+
+  void CoreManager::reinitialize_metadata_client() {
+    /// At this moment, parent needs to reset the metadata client only
+      client_ = utils::make_unique<MetadataServiceClient>(
+          server_url_, format_id(myip_, lo_, hi_));
   }
 
   std::unique_ptr<CoreManager> CoreManager::from_disk(const std::string& fpath,
@@ -193,7 +193,7 @@ namespace latte {
       try {
         manager->set_new_config_root(web::json::value::parse(config_data));
         manager->sync();
-      } catch(std::runtime_error e) {
+      } catch(const std::runtime_error& e) {
         log_err("caught error in recovering the core library, %s", e.what());
       }
     }
@@ -219,11 +219,11 @@ namespace latte {
       sync_principals();
       sync_objects();
       sync_images();
-    } catch(std::runtime_error e) {
+    } catch(const std::runtime_error& e) {
       log_err("runtime error during syncing: %s", e.what());
-    } catch (web::json::json_exception e) {
+    } catch (const web::json::json_exception& e) {
       log_err("json exception during syncing: %s", e.what());
-    } catch (web::http::http_exception e) {
+    } catch (const web::http::http_exception& e) {
       log_err("http exception during syncing: %s", e.what());
     }
 
@@ -279,13 +279,16 @@ namespace latte {
       notify_created(K_IMAGE, std::string(image_hash), 
           location.first->second->to_json());
       return 0;
-    } catch (std::runtime_error e) {
+    } catch (const std::runtime_error& e) {
+      log_err("create_image, runtime error %s", e.what());
       images_.erase(image_hash);
       return -1;
-    } catch (web::json::json_exception) {
+    } catch (const web::json::json_exception& e) {
+      log_err("create_image, json error %s", e.what());
       images_.erase(image_hash);
       return -2;
-    } catch (web::http::http_exception) {
+    } catch (const web::http::http_exception& e) {
+      log_err("create_image, http error %s", e.what());
       images_.erase(image_hash);
       return -3;
     }
@@ -309,23 +312,28 @@ namespace latte {
 
       client_->post_new_principal(format_principal_id(id), 
           myip_, prange.first, prange.second, image_hash, configs);
-      proxy_->set_child_ports((pid_t)id, prange.first, prange.second);
-      proxy_->add_reserved_ports(prange.first, prange.second);
+      int ret = proxy_->set_child_ports((pid_t)id, prange.first, prange.second);
+      log("set child port result: %d\n", ret);
+      ret = proxy_->add_reserved_ports(prange.first, prange.second);
+      log("add reserved port result: %d\n", ret);
       if (auto ref = tmp.lock()) {
         notify_created(K_PRINCIPAL, std::string(format_principal_id(id)),
             ref->to_json());
       }
-    } catch (std::runtime_error) {
+    } catch (const std::runtime_error& e) {
+      log_err("create_principal, runtime error %s", e.what());
       port_manager_->deallocate(prange.first);
       index_principals_.erase(prange.first);
       principals_.erase(id);
       return -1;
-    } catch (web::json::json_exception) {
+    } catch (const web::json::json_exception& e) {
+      log_err("create_principal, json error %s", e.what());
       port_manager_->deallocate(prange.first);
       index_principals_.erase(prange.first);
       principals_.erase(id);
       return -2;
-    } catch (web::http::http_exception) {
+    } catch (const web::http::http_exception& e) {
+      log_err("create_principal, http error %s", e.what());
       port_manager_->deallocate(prange.first);
       index_principals_.erase(prange.first);
       principals_.erase(id);
@@ -344,13 +352,16 @@ namespace latte {
       client_->post_object_acl(obj_id, requirement);
       notify_created(K_ACCESSOR, std::string(obj_id),
           insert_res.first->second->to_json());
-    } catch(std::runtime_error) {
+    } catch(const std::runtime_error& e) {
+      log_err("create_object_acl, runtime error %s", e.what());
       accessors_.erase(obj_id);
       return -1;
-    } catch (web::json::json_exception) {
+    } catch (const web::json::json_exception& e) {
+      log_err("create_object_acl, json error %s", e.what());
       accessors_.erase(obj_id);
       return -2;
-    } catch (web::http::http_exception) {
+    } catch (const web::http::http_exception& e) {
+      log_err("create_object_acl, http error %s", e.what());
       accessors_.erase(obj_id);
       return -3;
     }
@@ -364,11 +375,14 @@ namespace latte {
         log("Endorsing remote image: %s", image_hash.c_str());
       }
       client_->endorse_image(image_hash, endorsement);
-    } catch(std::runtime_error) {
+    } catch(const std::runtime_error& e) {
+      log_err("endorse_image, runtime error %s", e.what());
       return -1;
-    } catch (web::json::json_exception) {
+    } catch (const web::json::json_exception& e) {
+      log_err("endorse_image, json error %s", e.what());
       return -2;
-    } catch (web::http::http_exception) {
+    } catch (const web::http::http_exception& e) {
+      log_err("endorse_image, http error %s", e.what());
       return -3;
     }
     return 0;
@@ -378,25 +392,31 @@ namespace latte {
       uint32_t port, const std::string& property) noexcept {
     try {
       return client_->has_property(ip, port, property);
-    } catch(std::runtime_error) {
-      return false;
-    } catch (web::json::json_exception) {
-      return false;
-    } catch (web::http::http_exception) {
-      return false;
+    } catch(const std::runtime_error& e) {
+      log_err("attest_property, runtime error %s", e.what());
+      return -1;
+    } catch (const web::json::json_exception& e) {
+      log_err("attest_property, json error %s", e.what());
+      return -2;
+    } catch (const web::http::http_exception& e) {
+      log_err("attest_property, http error %s", e.what());
+      return -3;
     }
   }
 
   bool CoreManager::attest_principal_access(const std::string& ip,
       uint32_t port, const std::string& obj) noexcept {
     try {
-      return client_->has_property(ip, port, obj);
-    } catch(std::runtime_error) {
-      return false;
-    } catch (web::json::json_exception) {
-      return false;
-    } catch (web::http::http_exception) {
-      return false;
+      return client_->can_access(ip, port, obj);
+    } catch(const std::runtime_error& e) {
+      log_err("attest_access, runtime error %s", e.what());
+      return -1;
+    } catch (const web::json::json_exception& e) {
+      log_err("attest_access, json error %s", e.what());
+      return -2;
+    } catch (const web::http::http_exception& e) {
+      log_err("attest_access, http error %s", e.what());
+      return -3;
     }
   }
 
@@ -424,24 +444,19 @@ namespace latte {
 
   void CoreManager::notify_created(std::string&& type, std::string&& key,
       web::json::value v) {
-    std::unique_lock<std::mutex> guard(this->write_lock_);
+    std::unique_lock<std::mutex> guard(*this->write_lock_);
     this->sync_q_.emplace_back(std::move(type), std::move(key), true, v);
     this->sync_cond_.notify_one();
   }
 
   void CoreManager::notify_deleted(std::string&& type, std::string&& key) {
-    std::unique_lock<std::mutex> guard(this->write_lock_);
+    std::unique_lock<std::mutex> guard(*this->write_lock_);
     this->sync_q_.emplace_back(std::move(type), std::move(key), false, 
         web::json::value::Null);
     this->sync_cond_.notify_one();
   }
 
   void CoreManager::start_sync_thread() {
-
-    if (terminate_) {
-      log_err("trying to start sync thread at terminate phase, potential bug");
-      return;
-    }
     log("starting latte sync thread for process %lu\n", getpid());
     sync_thread_ = utils::make_unique<std::thread>([this]() noexcept {
 
@@ -452,7 +467,7 @@ namespace latte {
         // make it a ODR-use, which in addition requires definition of SYNC_DURATION.
         // We don't want the definition for real!
           constexpr int duration = SYNC_DURATION;
-          std::unique_lock<std::mutex> guard(this->write_lock_);
+          std::unique_lock<std::mutex> guard(*this->write_lock_);
           this->sync_cond_.wait_for(guard, std::chrono::seconds(duration),
               [this] { return this->sync_q_.size() > 0 || this->terminate_; });
           // Quit the loop for terminate signal
@@ -492,25 +507,80 @@ namespace latte {
     }
   }
 
+  void CoreManager::stop() {
+      client_.reset(nullptr);
+      if (sync_thread_) {
+        terminate();
+        try {
+          this->sync_thread_->join();
+        } catch(const std::system_error& e) {
+          log_err("error quiting the sync thread: %s", e.what());
+        }
+      }
+      /// NOTE: Only sync thread compete for this lock, and we must
+      // ensure upper level only call libport from a single thread.
+      this->write_lock_.reset(nullptr);
+  }
+  void CoreManager::reset_state(){
+    // Now the thread is not running!
+    // reinitialize the write lock!
+    this->write_lock_ = utils::make_unique<std::mutex>();
+    terminate_ = false;
+  }
+
 }
 
 
 static std::unique_ptr<latte::CoreManager> core = nullptr;
+static bool need_reinit_thread_pool = false;
+
+static void prepare_to_fork() {
+  if (core) {
+    /// Thread pool must be cleared inside before fork.
+    core->stop();
+  }
+  crossplat::threadpool::stop_shared();
+
+}
+
+
+static void parent_after_fork() {
+  if (core) {
+    core->reinitialize_metadata_client();
+    core->reset_state();
+    core->start_sync_thread();
+  }
+  crossplat::threadpool::reinit_shared();
+}
 
 static void clear_stall_state() {
   if (core) {
-    core->clear_stall_state();
     core.reset(nullptr);
   }
 }
 
+static void child_after_fork() {
+  clear_stall_state();
+  need_reinit_thread_pool = true;
+}
+
+static inline void register_fork_handle() {
+  pthread_atfork(prepare_to_fork, parent_after_fork,
+      child_after_fork);
+}
 
 // This must be called if a process intends to become an attester. It will
 // clear stalled information (if any)
 int libport_init(const char *server_url, const char *persistence_path) {
   clear_stall_state();
+  /// when to reinit??
+  if (need_reinit_thread_pool) {
+    crossplat::threadpool::reinit_shared();
+  }
+  // reinitialize the thread pool if needed
+  register_fork_handle();
   try {
-    std::string myip = get_myip();
+    std::string myip = latte::utils::get_myip();
     if (myip.compare("") == 0) {
       latte::log_err("failed to initialize libport principal identity");
       return -1;
@@ -524,24 +594,43 @@ int libport_init(const char *server_url, const char *persistence_path) {
           persistence_path, latte::utils::make_unique<SyscallProxyImpl>());
     }
     core->start_sync_thread();
-  } catch (std::runtime_error) {
+  } catch (const web::http::http_exception& e) {
+    latte::log_err("init: http error %s", e.what());
+    return -3;
+  } catch (const std::system_error& e) {
+    latte::log_err("init: system error %s", e.what());
+    return -2;
+  } catch (const std::runtime_error& e) {
+    latte::log_err("init: runtime error %s", e.what());
     return -1;
+  } catch (...) {
+    latte::log_err("init: unknown exception caught");
   }
   return 0;
 }
 
 int libport_reinit(const char *server_url, const char *persistence_path) {
   clear_stall_state();
+  register_fork_handle();
   try {
-    std::string myip = get_myip();
+    std::string myip = latte::utils::get_myip();
     if (myip.compare("") == 0) {
       latte::log_err("failed to initialize libport principal identity");
       return -1;
     }
     core = latte::CoreManager::from_disk(persistence_path, server_url, myip);
     core->start_sync_thread();
-  } catch (std::runtime_error) {
+  } catch (const web::http::http_exception& e) {
+    latte::log_err("reinit: http error %s", e.what());
+    return -3;
+  } catch (const std::system_error& e) {
+    latte::log_err("reinit: system error %s", e.what());
+    return -2;
+  } catch (const std::runtime_error& e) {
+    latte::log_err("reinit: runtime error %s", e.what());
     return -1;
+  } catch (...) {
+    latte::log_err("reinit: unknown exception caught");
   }
   return 0;
 
@@ -587,7 +676,7 @@ int post_object_acl(const char *obj_id, const char *requirement) {
 int endorse_image(const char *image_hash, const char *endorsement) {
   CHECK_LIB_INIT;
   latte::log("endorsing image: %s, %s\n", image_hash, endorsement);
-  return core->post_object_acl(image_hash, endorsement);
+  return core->endorse_image(image_hash, endorsement);
 }
 
 bool attest_principal_property(const char *ip, uint32_t port, const char *prop) {
@@ -609,6 +698,9 @@ int delete_principal(uint64_t uuid) {
 }
 
 
+void libport_set_log_level(int upto) {
+  latte::setloglevel(upto);
+}
 
 
 

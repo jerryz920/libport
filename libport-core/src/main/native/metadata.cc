@@ -161,11 +161,21 @@ void MetadataServiceClient::post_new_principal(const std::string& principal_name
           auto wrap = result["message"].as_string();
           auto start = wrap.find('\'');
           if (start == std::string::npos) {
-            log_err("no quote found in message: %s", wrap.c_str());
-            throw std::runtime_error("");
+            std::stringstream ss;
+            ss <<"no quote found in message: " << wrap.c_str();
+            auto s = ss.str();
+            log_err(s.c_str());
+            throw std::runtime_error(std::move(s));
           }
           auto end = wrap.rfind('\'');
-          auto key = wrap.substr(start + 1, end - start);
+          if (end == start) {
+            std::stringstream ss;
+            ss << "ill formed return message, can not find key: " << wrap.c_str();
+            auto s = ss.str();
+            log_err(s.c_str());
+            throw std::runtime_error(std::move(s));
+          }
+          auto key = wrap.substr(start + 1, end - start - 1);
           return this->post_statement("/updateSubjectSet", myid(), {key});
         } catch(std::runtime_error &e) {
           return pplx::task_from_exception<web::http::http_response>(

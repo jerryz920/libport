@@ -7,8 +7,12 @@ fi
 
 go build $1/metadata_stub.go
 sleep 0.5
-./metadata_stub &
-p=$!
+if test -f $1/gostub.pid; then
+  kill -KILL $(cat $1/gostub.pid)
+  echo "kill state $?"
+fi
+./metadata_stub >$1/stub.out 2>$1/stub.err &
+echo $! > $1/gostub.pid
 sleep 1.0
 ./test_metadata
 if [ $? ]; then
@@ -16,4 +20,5 @@ if [ $? ]; then
 else
   exit 2
 fi
-kill $p
+kill -KILL $(cat $1/gostub.pid)
+echo "kill state $?"

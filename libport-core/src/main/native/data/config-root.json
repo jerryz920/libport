@@ -1,0 +1,82 @@
+{
+    "accessors": {
+        "obj0": {
+            "acls": [
+                "acl"
+            ],
+            "name": "obj0"
+        },
+        "obj1": {
+            "acls": [
+                "acl"
+            ],
+            "name": "obj1"
+        },
+        "obj2": {
+            "acls": [
+                "acl"
+            ],
+            "name": "obj2"
+        },
+        "obj3": {
+            "acls": [
+                "acl"
+            ],
+            "name": "obj3"
+        },
+        "obj4": {
+            "acls": [
+                "acl"
+            ],
+            "name": "obj4"
+        }
+    },
+    "images": {
+        "hash0": {
+            "configs": "config0",
+            "hash": "hash0",
+            "revision": "rev0",
+            "url": "url0"
+        },
+        "hash1": {
+            "configs": "config1",
+            "hash": "hash1",
+            "revision": "rev1",
+            "url": "url1"
+        },
+        "hash2": {
+            "configs": "config2",
+            "hash": "hash2",
+            "revision": "rev2",
+            "url": "url2"
+        },
+        "hash3": {
+            "configs": "config3",
+            "hash": "hash3",
+            "revision": "rev3",
+            "url": "url3"
+        },
+        "hash4": {
+            "configs": "config4",
+            "hash": "hash4",
+            "revision": "rev4",
+            "url": "url4"
+        }
+    },
+    "principals": {
+        "0x3": {
+            "configs": "config3",
+            "hi": "65505",
+            "id": "0x3",
+            "image": "image3",
+            "lo": "65495"
+        },
+        "0x4": {
+            "configs": "config4",
+            "hi": "65495",
+            "id": "0x4",
+            "image": "image4",
+            "lo": "65485"
+        }
+    }
+}

@@ -84,11 +84,11 @@ func ParseIP(msg string) (string, int, int, int) {
 	} else {
 		var p1, p2 int64
 		var err error
-		if p1, err = strconv.ParseInt(matches[2], 10, 16); err != nil {
+		if p1, err = strconv.ParseInt(matches[2], 10, 32); err != nil {
 			log.Errorf("error parsing port min: %v", err)
 			return "", 0, 0, http.StatusBadRequest
 		}
-		if p2, err = strconv.ParseInt(matches[3], 10, 16); err != nil {
+		if p2, err = strconv.ParseInt(matches[3], 10, 32); err != nil {
 			log.Errorf("error parsing port max: %v", err)
 			return "", 0, 0, http.StatusBadRequest
 		}
@@ -102,12 +102,23 @@ func GetPrincipal(ip string) (*Principal, int) {
 		log.Errorf("error parsing IP: %s\n", ip)
 		return nil, http.StatusBadRequest
 	}
-	port, err := strconv.ParseInt(parts[1], 10, 16)
+	port, err := strconv.ParseInt(parts[1], 10, 32)
+	log.Infof("Looking for principal of %s-%d\n\n, current dicts: %v", parts[0], port,
+		store.Principals)
 	if err != nil {
 		log.Errorf("error parsing port: %v\n", err)
 		return nil, http.StatusBadRequest
 	}
 	for _, p := range store.Principals {
+		if parts[0] != p.IP {
+			log.Infof("IP not matched")
+		}
+		if int(port) < p.PortMin {
+			log.Infof("Min port smaller!")
+		}
+		if int(port) > p.PortMax {
+			log.Infof("max port larger")
+		}
 		if parts[0] == p.IP && int(port) >= p.PortMin && int(port) <= p.PortMax {
 			return &p, http.StatusOK
 		}
@@ -191,6 +202,9 @@ func postImageProperty(w http.ResponseWriter, r *http.Request) {
 		LoggedWriteHeader(w, http.StatusNotFound)
 	} else {
 		i.Properties[m.OtherValues[1]] = "set"
+		log.Infof("posting property %v for %s, image store: %v",
+			m.OtherValues[1], m.OtherValues[0], store.Images)
+
 		LoggedWriteHeader(w, http.StatusOK)
 	}
 }
@@ -233,6 +247,8 @@ func attestAppProperty(w http.ResponseWriter, r *http.Request) {
 		}
 		if _, ok = i.Properties[m.OtherValues[1]]; !ok {
 			LoggedWriteHeader(w, http.StatusNotFound)
+			LoggedWrite(w, []byte(`{"message": "object not found"}`))
+			return
 		} else {
 			LoggedWriteHeader(w, http.StatusOK)
 			LoggedWrite(w, []byte(`{"message": "{ 'void':programHasProperty('','') }"}`))
@@ -266,6 +282,7 @@ func attestObjectAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, wanted := range o.Acls {
+		log.Infof("image info: %v", i)
 		if _, ok := i.Properties[wanted]; ok {
 			LoggedWrite(w, []byte(`{"message":  "{ 'void':approveAccess('','') }"}`))
 			return

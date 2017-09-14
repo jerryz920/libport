@@ -71,6 +71,7 @@ class CoreManager {
     CoreManager(CoreManager&& other):
       terminate_(false),
       myip_(std::move(other.myip_)),
+      server_url_(std::move(other.server_url_)),
       local_port_lo_(other.local_port_lo_),
       local_port_hi_(other.local_port_hi_),
       persistence_path_(std::move(other.persistence_path_)),
@@ -87,6 +88,7 @@ class CoreManager {
     CoreManager& operator =(CoreManager&& other) {
       terminate_ = false;
       myip_ = std::move(other.myip_);
+      server_url_ = std::move(other.server_url_);
       local_port_lo_ = other.local_port_lo_;
       local_port_hi_ = other.local_port_hi_;
       persistence_path_ = std::move(other.persistence_path_);
@@ -105,9 +107,8 @@ class CoreManager {
         const std::string& persistence_path, std::unique_ptr<SyscallProxy> s);
     virtual ~CoreManager();
 
-    void clear_stall_state() {
-      sync_thread_ = nullptr;
-    }
+    void stop();
+    void reset_state();
 
 
     /// operations, we may want to use this as "build_image"
@@ -155,12 +156,15 @@ class CoreManager {
     bool has_image(std::string hash) const;
     bool has_accessor(std::string id) const;
 
+    void reinitialize_metadata_client();
+
   protected:
     /// Methods only intended for testing
     CoreManager() {}
     inline void set_metadata_client(std::unique_ptr<MetadataServiceClient> c) {
       client_.swap(c);
     }
+
 
     inline web::json::value get_config_root() {
       return config_root_;
@@ -195,12 +199,16 @@ class CoreManager {
     void sync_objects();
     /// Only called for destruct
     inline void terminate() {
+      std::unique_lock<std::mutex> guard(*this->write_lock_);
       terminate_ = true;
+      sync_cond_.notify_one();
     }
+
 
 
     bool terminate_;
     std::string myip_;
+    std::string server_url_;
     uint32_t local_port_lo_;
     uint32_t local_port_hi_;
     std::string persistence_path_;
@@ -210,13 +218,16 @@ class CoreManager {
     std::unordered_map<uint64_t, std::shared_ptr<Principal>> principals_;
     std::unordered_map<std::string, std::unique_ptr<Image>> images_;
     std::unordered_map<std::string, std::unique_ptr<AccessorObject>> accessors_;
-    std::mutex write_lock_;
+    std::unique_ptr<std::mutex> write_lock_;
     // the queue with on the fly syncing content
     std::vector< std::tuple<std::string, std::string, bool, web::json::value> > sync_q_;
     std::condition_variable sync_cond_;
     std::unique_ptr<std::thread> sync_thread_;
     web::json::value config_root_; // root of json object that does sync
     std::unique_ptr<SyscallProxy> proxy_; // Only do this for testing.
+    /// Local port range
+    int lo_;
+    int hi_;
 };
 
 }

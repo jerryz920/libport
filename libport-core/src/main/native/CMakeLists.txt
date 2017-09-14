@@ -11,15 +11,18 @@ find_package(Boost 1.54 REQUIRED COMPONENTS unit_test_framework system)
 find_library(CPPREST cpprest)
 find_library(SSL ssl)
 find_library(CRYPTO crypto)
-
-add_library(port core.cc log.cc metadata.cc serialization.cc utils.cc)
-include_directories("${PROJECT_SOURCE_DIR}/include")
-include_directories(SYSTEM "/usr/local/include")
-
+find_package(Threads)
 # testing
 enable_testing()
 set(Boost_ADDITIONAL_VERSIONS "1.54" "1.54.0")
-set(library_dependencies boost_system crypto ssl cpprest port)
+set(port_library_dependencies boost_system crypto ssl cpprest ${CMAKE_THREAD_LIBS_INIT})
+set(library_dependencies port boost_system crypto ssl cpprest ${CMAKE_THREAD_LIBS_INIT})
+
+add_library(port SHARED core.cc log.cc metadata.cc serialization.cc utils.cc)
+target_link_libraries(port ${port_library_dependencies})
+include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories(SYSTEM "/usr/local/include")
+
 
 add_executable(test_port_manager test_port_manager.cc)
 target_include_directories(test_port_manager PRIVATE ${Boost_INCLUDE_DIRS} test-include)
@@ -58,6 +61,10 @@ else (NOT GOTOOL)
   add_test(NAME test_metadata
     COMMAND /bin/bash ${PROJECT_SOURCE_DIR}/test_metadata.sh ${PROJECT_SOURCE_DIR})
 endif (NOT GOTOOL)
+
+# integration test, do not add it to ctest
+add_executable(test_integration test_integration.cc)
+target_link_libraries(test_integration -L/usr/local/lib ${library_dependencies})
 
 
 

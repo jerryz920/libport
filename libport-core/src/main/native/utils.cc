@@ -6,6 +6,9 @@
 #include <string>
 #include <errno.h>
 #include <string.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 namespace latte {
   namespace utils {
@@ -26,6 +29,37 @@ std::string read_file(const std::string& fpath) {
     log_err("read file %s, open: %s", fpath.c_str(), strerror(errno));
     return "";
   }
+}
+
+std::string get_myip() {
+
+  struct ifaddrs *addrs;
+  if (getifaddrs(&addrs)) {
+    throw std::runtime_error(strerror(errno));
+  }
+
+  for (struct ifaddrs *cur = addrs; cur != NULL; cur = cur->ifa_next) {
+    /// filter the loopback interface
+    if (strcmp(cur->ifa_name, "lo") == 0) {
+      continue;
+    }
+    /// We don't use IPv6 at the moment
+    if (cur->ifa_addr->sa_family != AF_INET) {
+      continue;
+    }
+    /// format IP
+    char ipbuf[INET_ADDRSTRLEN + 1];
+    if (inet_ntop(AF_INET, &((struct sockaddr_in*)cur->ifa_addr)->sin_addr,
+        ipbuf, INET_ADDRSTRLEN)) {
+      freeifaddrs(addrs);
+      return std::string(ipbuf);
+    } else {
+      freeifaddrs(addrs);
+      throw std::runtime_error(strerror(errno));
+    }
+  }
+  freeifaddrs(addrs);
+  return "";
 }
 }
 }

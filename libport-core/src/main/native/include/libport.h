@@ -65,6 +65,9 @@ bool attest_principal_access(const char *ip, uint32_t port, const char *obj);
 //   * the statement (the last thing not implemented yet)
 int delete_principal(uint64_t uuid);
 
+// log setting
+void libport_set_log_level(int upto);
+
 
 #ifdef __cplusplus
 }
