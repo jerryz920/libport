@@ -10,6 +10,7 @@
 #include "port_manager.h"
 #include "utils.h"
 #include "pplx/threadpool.h"
+#include <pthread.h>
 
 #include <unordered_map>
 #include <sys/types.h>
@@ -508,6 +509,7 @@ namespace latte {
   }
 
   void CoreManager::stop() {
+      log("%d, stop current mutex ptr: %p\n", getpid(), write_lock_.get());
       client_.reset(nullptr);
       if (sync_thread_) {
         terminate();
@@ -524,6 +526,7 @@ namespace latte {
   void CoreManager::reset_state(){
     // Now the thread is not running!
     // reinitialize the write lock!
+    log("%d reseting mutex!", getpid());
     this->write_lock_ = utils::make_unique<std::mutex>();
     terminate_ = false;
   }
@@ -545,12 +548,12 @@ static void prepare_to_fork() {
 
 
 static void parent_after_fork() {
+  crossplat::threadpool::reinit_shared();
   if (core) {
     core->reinitialize_metadata_client();
     core->reset_state();
     core->start_sync_thread();
   }
-  crossplat::threadpool::reinit_shared();
 }
 
 static void clear_stall_state() {
@@ -561,9 +564,13 @@ static void clear_stall_state() {
 
 static void child_after_fork() {
   clear_stall_state();
+  /// make sure the reserved ports are cleared after fork... Why we 
+  //even copy it in kernel?
+  ::clear_reserved_ports();
   need_reinit_thread_pool = true;
 }
 
+static pthread_once_t once;
 static inline void register_fork_handle() {
   pthread_atfork(prepare_to_fork, parent_after_fork,
       child_after_fork);
@@ -578,7 +585,7 @@ int libport_init(const char *server_url, const char *persistence_path) {
     crossplat::threadpool::reinit_shared();
   }
   // reinitialize the thread pool if needed
-  register_fork_handle();
+  pthread_once(&once, register_fork_handle);
   try {
     std::string myip = latte::utils::get_myip();
     if (myip.compare("") == 0) {
@@ -594,6 +601,7 @@ int libport_init(const char *server_url, const char *persistence_path) {
           persistence_path, latte::utils::make_unique<SyscallProxyImpl>());
     }
     core->start_sync_thread();
+    latte::log("libport core initialized for process %d\n", getpid());
   } catch (const web::http::http_exception& e) {
     latte::log_err("init: http error %s", e.what());
     return -3;

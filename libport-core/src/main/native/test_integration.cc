@@ -33,11 +33,12 @@ int wait_principal(pid_t child) {
     ret = -1;
   }
   if (WIFEXITED(status)) {
+    printf("%d exit!\n", child);
     ret = WEXITSTATUS(status);
   } else {
     ret = -2;
   }
-  ::delete_principal(child);
+  //::delete_principal(child);
   return ret;
 }
 
@@ -88,6 +89,7 @@ bool client_try_access(int local_port) {
   if (connect(c, (struct sockaddr*) (&addr), sizeof(addr)) < 0) {
     /// This way we only quit the client process, server needs
     // to capture the status
+    perror("connect");
     SUSPEND("fail to connect to server ");
   }
   getsockname(c, (struct sockaddr*) &my_addr, &my_addr_len);
@@ -107,7 +109,7 @@ bool client_try_access(int local_port) {
     }
   }
   close(c);
-  return buf == '\0';
+  return buf == 1;
 }
 
 
@@ -122,22 +124,24 @@ int accept_child_task() {
 int reject_normal_child_task() {
   /// connect to local_abac_port
   if (client_try_access(local_abac_port)) {
-    return 1;
+    return 0;
   }
-  return 0;
+  return 1;
 }
 
 int attester_child_task() {
   /// works as attester, create a new attester with accepted image and try.
   ::libport_init(server_url.c_str(), "/tmp/libport-integration-child.json");
   pid_t child;
+  fprintf(stderr, "entering attester\n");
   if ((child = fork()) == 0) {
     /// child
-    accept_child_task();
-    exit(0);
+    usleep(100000);
+    exit(accept_child_task());
 
   } else {
-    ::create_principal(child, "image_accept", "config_accept", 100);
+    fprintf(stderr, "before create first principal \n");
+    ::create_principal(child, "image_accept", "config_accept", 10);
     int ret = wait_principal(child);
     if (ret != 0) {
       fprintf(stderr, "ChildAttester: child that should be accepted returns %d\n", ret);
@@ -149,11 +153,12 @@ int attester_child_task() {
   // fork and simulate bad principal
   if ((child = fork()) == 0) {
     /// child
-    reject_normal_child_task();
-    exit(0);
+    usleep(100000);
+    exit(reject_normal_child_task());
 
   } else {
-    ::create_principal(child, "image_reject", "config_reject", 100);
+    fprintf(stderr, "before create second principal \n");
+    ::create_principal(child, "image_reject", "config_reject", 10);
     int ret = wait_principal(child);
     if (ret != 1) {
       fprintf(stderr, "ChildAttester: child that should fail returns %d\n", ret);
@@ -201,7 +206,7 @@ int main(int argc, char **argv) {
             int client_port = ntohs(client_addr.sin_port);
             bool allow_access = ::attest_principal_access(client_ip, client_port,
                 object_to_attest.c_str());
-            char buf = allow_access;
+            char buf = allow_access? 1: 0;
             while (true) {
               int ret = send(c, &buf, 1, MSG_NOSIGNAL);
               if ((ret < 0 && errno == EAGAIN) || ret == 0) {
@@ -240,8 +245,7 @@ int main(int argc, char **argv) {
   if ((child = fork()) == 0) {
     /// child
     usleep(100000);
-    accept_child_task();
-    exit(0);
+    exit(accept_child_task());
 
   } else {
     fprintf(stderr, "launched child %d\n", child);
@@ -254,36 +258,35 @@ int main(int argc, char **argv) {
   }
 
   // fork and simulate bad principal
-  //if ((child = fork()) == 0) {
-  //  /// child
-  //  reject_normal_child_task();
-  //  exit(0);
+  if ((child = fork()) == 0) {
+    /// child
+    usleep(100000);
+    exit(reject_normal_child_task());
 
-  //} else {
-  //  wait_principal(child);
-  //  ::create_principal(child, "image_accept", "config_accept", 100);
-  //  int ret = wait_principal(child);
-  //  if (ret != 1) {
-  //    fprintf(stderr, "child that should fail returns %d\n", ret);
-  //    FAIL("principal failure\n");
-  //  }
-  //}
+  } else {
+    ::create_principal(child, "image_reject", "config_reject", 100);
+    int ret = wait_principal(child);
+    if (ret != 1) {
+      fprintf(stderr, "child that should fail returns %d\n", ret);
+      FAIL("principal failure\n");
+    }
+  }
 
-  //fprintf(stderr, "------start of attester task -----\n");
-  //// fork and simulate bad principal
-  //if ((child = fork()) == 0) {
-  //  /// child
-  //  attester_child_task();
-  //  exit(0);
+  fprintf(stderr, "------start of attester task -----\n");
+  // fork and simulate bad principal
+  if ((child = fork()) == 0) {
+    /// child
+    attester_child_task();
+    exit(0);
 
-  //} else {
-  //  ::create_principal(child, "image_accept", "config_accept", 100);
-  //  int ret = wait_principal(child);
-  //  if (ret != 0) {
-  //    fprintf(stderr, "MainProcess: attester child returns %d\n", ret);
-  //    FAIL("main process principal failure\n");
-  //  }
-  //}
+  } else {
+    ::create_principal(child, "image_accept", "config_accept", 100);
+    int ret = wait_principal(child);
+    if (ret != 0) {
+      fprintf(stderr, "MainProcess: attester child returns %d\n", ret);
+      FAIL("main process principal failure\n");
+    }
+  }
   // simulate restart, resume from last config check point
 
   terminate = true;

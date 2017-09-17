@@ -8,6 +8,7 @@ RUN sudo apt-get update -y
 RUN cd /opt/ && bash install_lib.sh
 RUN apt-get install -y gdb strace vim
 RUN apt-get install -y rsyslog
+RUN cd /opt/net/casablanca/ && git pull origin dev && cd Release/build.release && make -j 5 install
 COPY 50-default.conf /etc/rsyslog.d/
 RUN update-rc.d rsyslog defaults
 COPY test_core /opt/
