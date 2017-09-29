@@ -191,7 +191,6 @@ int main(int argc, char **argv) {
 
   auto listener = std::thread([&terminate]() {
       int server_s = create_server_socket(local_abac_port);
-      printf("captured terminate %p\n", &terminate);
       while (!terminate) {
         struct sockaddr_in client_addr;
         socklen_t client_addr_len = sizeof(client_addr);

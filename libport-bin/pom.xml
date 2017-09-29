@@ -13,12 +13,14 @@
   </parent>
 
   <dependencies>
+    <!--
     <dependency>
       <groupId>org.latte.libport</groupId>
       <artifactId>libport-core</artifactId>
       <version>0.1.0</version>
       <type>so</type>
     </dependency>
+    -->
     <dependency>
       <groupId>org.latte.libport</groupId>
       <artifactId>libport-java</artifactId>
@@ -46,6 +48,7 @@
 		<classifier>with-dependencies</classifier>
 		<outputDirectory>${project.basedir}/../dist</outputDirectory>
 	      </artifactItem>
+    <!--
 	      <artifactItem>
 		<groupId>org.latte.libport</groupId>
 		<artifactId>libport-core</artifactId>
@@ -54,12 +57,14 @@
 		<outputDirectory>${project.basedir}/../dist</outputDirectory>
 		<destFileName>libport-core.so</destFileName>
 	      </artifactItem>
+	      -->
 	    </artifactItems>
 	  </configuration>
 	</execution>
       </executions>
       <inherited>false</inherited>
     </plugin>
+    <!--
     <plugin>
       <groupId>org.apache.maven.plugins</groupId>
       <artifactId>maven-antrun-plugin</artifactId>
@@ -83,6 +88,7 @@
 	</execution>
       </executions>
     </plugin>
+    -->
   </plugins>
 </build>
 </project>

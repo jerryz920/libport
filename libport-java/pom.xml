@@ -36,6 +36,7 @@
       <artifactId>jna-platform</artifactId>
       <version>4.4.0</version>
     </dependency>
+    <!--
     <dependency>
       <groupId>org.latte.libport</groupId>
       <artifactId>libport-core</artifactId>
@@ -43,6 +44,7 @@
       <type>so</type>
       <scope>runtime</scope>
     </dependency>
+    -->
   </dependencies>
 
   <build>
