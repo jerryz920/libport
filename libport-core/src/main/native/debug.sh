@@ -13,11 +13,17 @@ mkdir -p integration_tests
 cd build.Debug
 cmake ..
 make -j
-cp test_integration libport.so libport.a ../integration_tests
+cp test_core test_integration libport.so libport.a ../integration_tests
 cp ../*.cc ../integration_tests
 cp ../include/*.h ../integration_tests
-cd ../integration_tests
-eval $(docker-machine env v1)
+cd ..
+current=`pwd`
+cd ../../../../
+mvn package
+cp libport-dist/*.jar $current
+
+cd $current/integration_tests
+eval $(docker-machine env ${1:-v1})
 docker build -t int_test .
 docker run -it -e LD_LIBRARY_PATH=/usr/local/lib/ --rm --cap-add SYS_PTRACE --security-opt seccomp=unconfined int_test bash
 cd ..

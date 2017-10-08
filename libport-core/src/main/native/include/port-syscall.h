@@ -44,6 +44,7 @@ extern "C" {
 #define ADD_PROC_RESERVED_PORTS	      329	
 #define DELETE_PROC_RESERVED_PORTS    330	
 #define CLEAR_PROC_RESERVED_PORTS     331	
+#define ALLOC_PROC_LOCAL_PORTS     332
 
 #elif defined (__i386__)
 #define GET_PROC_LOCAL_PORTS	      377	
@@ -52,6 +53,7 @@ extern "C" {
 #define ADD_PROC_RESERVED_PORTS	      380	
 #define DELETE_PROC_RESERVED_PORTS    381	
 #define CLEAR_PROC_RESERVED_PORTS     382	
+#define ALLOC_PROC_LOCAL_PORTS     383
 #else
 #error "not supported architecture!"
 #endif
@@ -91,6 +93,10 @@ static inline int del_reserved_ports(int lo, int hi) {
 
 static inline int clear_reserved_ports() {
   return syscall(CLEAR_PROC_RESERVED_PORTS, 0);
+}
+
+static inline int alloc_child_ports(pid_t ppid, pid_t pid, int n) {
+  return syscall(ALLOC_PROC_LOCAL_PORTS, ppid, pid, n);
 }
 
 

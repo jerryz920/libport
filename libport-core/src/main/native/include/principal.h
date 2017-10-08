@@ -54,7 +54,8 @@ class Principal {
     Principal(Principal &&other):
       id_(other.id_), local_lo_(other.local_lo_),
       local_hi_(other.local_hi_), image_(std::move(other.image_)),
-      configs_(std::move(other.configs_)) {}
+      configs_(std::move(other.configs_)),
+      bearer_(std::move(other.bearer_)){}
 
     Principal& operator =(Principal &&other) {
       id_ = other.id_;
@@ -62,19 +63,20 @@ class Principal {
       local_hi_ = other.local_hi_;
       image_ = std::move(other.image_);
       configs_ = std::move(other.configs_);
+      bearer_ = std::move(other.bearer_);
       return *this;
     }
 
     Principal(uint64_t id, int lo, int hi, const std::string& image,
-        const std::string& configs=""):
+        const std::string& configs, const std::string& bearer=""):
       id_(id), local_lo_(lo), local_hi_(hi), image_(image),
-      configs_(configs){}
+      configs_(configs), bearer_(bearer){}
 
     inline uint64_t id() const { return id_; }
-    inline int lo() const { return local_lo_; }
-    inline int hi() const { return local_hi_; }
+    inline uint32_t lo() const { return local_lo_; }
+    inline uint32_t hi() const { return local_hi_; }
 
-    inline void set_local(int lo, int hi) {
+    inline void set_local(uint32_t lo, uint32_t hi) {
       if (lo > local_lo_) {
         local_lo_ = lo;
       }
@@ -89,6 +91,11 @@ class Principal {
     inline const std::string& configs() const {
       return configs_;
     }
+    inline const std::string& bearer() const { return bearer_; }
+
+    inline void set_bearer(const std::string& bearer) {
+      bearer_ = bearer;
+    }
 
     web::json::value to_json() const;
     static Principal from_json(web::json::value v);
@@ -99,10 +106,11 @@ class Principal {
     /// Note we don't include IP address because it should be determined
     // at runtime.
     uint64_t id_;
-    int local_lo_;
-    int local_hi_;
+    uint32_t local_lo_;
+    uint32_t local_hi_;
     std::string image_;
     std::string configs_; // configs is properly escaped
+    std::string bearer_; // used for safe
 };
 }
 #endif

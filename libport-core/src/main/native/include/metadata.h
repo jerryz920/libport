@@ -58,7 +58,7 @@ class MetadataServiceClient {
 
 
     /// the byte array is just 
-    virtual void post_new_principal(
+    virtual std::string post_new_principal(
         const std::string& principal_name,
         const std::string& principal_ip, int port_min,
         int port_max, const std::string& image_hash,
@@ -69,8 +69,11 @@ class MetadataServiceClient {
         const std::string& source_rev,
         const std::string& misc_conf);
 
-//    void remove_principal(const std::string& host_ip, int port_min,
-//        int port_max);
+    virtual void remove_principal(
+        const std::string& principal_name,
+        const std::string& principal_ip, int port_min,
+        int port_max, const std::string& image_hash,
+        const std::string& configs);
 //
 //    void remove_image(const std::string& image_hash);
 
@@ -86,10 +89,11 @@ class MetadataServiceClient {
     //void endorse_source(const std::string& source_url,
     //    const std::string& source_revision, const std::string& endorsement);
 
+    // bearer should use the value returned by "post_new_principal"
     virtual bool has_property(const std::string& principal_ip, int port,
-        const std::string& property);
+        const std::string& property, const std::string& bearer_ref);
     virtual bool can_access(const std::string& principal_ip, int port,
-        const std::string& access_object);
+        const std::string& access_object, const std::string& bearer_ref);
 
     const std::string& myid() const { return myid_; }
 
@@ -97,7 +101,8 @@ class MetadataServiceClient {
     pplx::task<web::http::http_response> post_statement(
         const std::string& api_path,
         const std::string& target,
-        const std::vector<std::string>& statements);
+        const std::vector<std::string>& statements,
+        const std::string& bearer_ref = "");
 
     std::unique_ptr<web::http::client::http_client> client_;
     std::string myid_;

@@ -9,6 +9,7 @@
 #include "accessor_object.h"
 #include "port_manager.h"
 #include "utils.h"
+#include "safe.h"
 #include "pplx/threadpool.h"
 #include <pthread.h>
 
@@ -119,13 +120,16 @@ class SyscallProxyImpl: public latte::SyscallProxy {
       return ::get_local_ports(lo, hi);
     }
     int add_reserved_ports(int lo, int hi) override {
-      return ::add_reserved_ports(lo, hi);
+      return ::add_reserved_ports(lo, hi-1);
     }
     int del_reserved_ports(int lo, int hi) override {
-      return ::del_reserved_ports(lo, hi);
+      return ::del_reserved_ports(lo, hi-1);
     }
     int clear_reserved_ports() override {
       return ::clear_reserved_ports();
+    }
+    int alloc_child_ports(pid_t ppid, pid_t pid, int n) override {
+      return ::alloc_child_ports(ppid, pid, n);
     }
 
     void get_system_local_ports(int *lo, int *hi) {
@@ -151,7 +155,7 @@ namespace latte {
       if (proxy_->get_local_ports(&lo_, &hi_) != 0) {
         throw std::runtime_error("error fetching ip local ports");
       }
-      port_manager_ = utils::make_unique<PortManager>((uint32_t) lo_, (uint32_t) hi_);
+      //port_manager_ = utils::make_unique<PortManager>((uint32_t) lo_, (uint32_t) hi_);
       /// TODO:
       // Refactor this: metadata service client needs not be a concrete type, hard
       // for testing and replacing
@@ -205,7 +209,13 @@ namespace latte {
     return principals_.find(id) != principals_.cend();
   }
   bool CoreManager::has_principal_by_port(uint32_t port) const {
-    return port_manager_->is_allocated(port);
+    auto index = index_principals_.lower_bound(port);
+    auto ptr = index->second.lock();
+    if (!ptr) {
+      log_err("accessing dead principal with port %d\n", port);
+      return false;
+    }
+    return ptr->lo() <= port && ptr->hi() > port;
   }
   bool CoreManager::has_image(std::string hash) const {
     return images_.find(hash) != images_.end();
@@ -260,9 +270,14 @@ namespace latte {
         log("process %llu is not running! Syncing anyway\n", p.id());
       }
       principals_.emplace(p.id(), utils::make_unique<Principal>(std::move(p)));
-      port_manager_->allocate(p.lo(), p.hi());
-      proxy_->set_child_ports(p.id(), p.lo(), p.hi());
-      proxy_->add_reserved_ports(p.lo(), p.hi());
+      /// We should guarantee this method is not paralleled with other process running
+      int err = proxy_->set_child_ports(p.id(), p.lo(), p.hi());
+      if (err != 0) {
+        log_err("can not recover the principal %llu with port %d-%d: %s\n",p.id(),
+            p.lo(), p.hi(), strerror(-err));
+      } else {
+        proxy_->add_reserved_ports(p.lo(), p.hi());
+      }
     }
   }
 
@@ -297,46 +312,48 @@ namespace latte {
 
   int CoreManager::create_principal(uint64_t id,
       const std::string& image_hash, const std::string& configs, int nport) noexcept {
-    PortManager::PortPair prange;
-    try {
-      prange = port_manager_->allocate(nport);
-    } catch (std::runtime_error) {
+    int v = proxy_->alloc_child_ports(0, id, nport);
+    if (v < 0) {
+      log_err("error in allocating child ports: %s\n", strerror(-v));
       return -1;
     }
+    uint32_t port_low = v;
+    uint32_t port_high = port_low + nport;
 
     try {
+      std::string bearer = client_->post_new_principal(format_principal_id(id), 
+          myip_, port_low, port_high, image_hash, configs);
       std::shared_ptr<Principal> newp = std::make_shared<Principal>(id,
-            prange.first, prange.second, image_hash, configs);
-      index_principals_[prange.first] = std::weak_ptr<Principal>(newp);
+            port_low, port_high, image_hash, configs, bearer);
+      index_principals_[port_low] = std::weak_ptr<Principal>(newp);
       std::weak_ptr<Principal> tmp(newp);
       principals_[id] = std::move(newp);
 
-      client_->post_new_principal(format_principal_id(id), 
-          myip_, prange.first, prange.second, image_hash, configs);
-      int ret = proxy_->set_child_ports((pid_t)id, prange.first, prange.second);
-      log("set child port result: %d\n", ret);
-      ret = proxy_->add_reserved_ports(prange.first, prange.second);
-      log("add reserved port result: %d\n", ret);
+      /// comment this off with alloc semantic
       if (auto ref = tmp.lock()) {
         notify_created(K_PRINCIPAL, std::string(format_principal_id(id)),
             ref->to_json());
       }
     } catch (const std::runtime_error& e) {
       log_err("create_principal, runtime error %s", e.what());
-      port_manager_->deallocate(prange.first);
-      index_principals_.erase(prange.first);
+      //port_manager_->deallocate(port_low);
+      /// del reserved port
+      proxy_->del_reserved_ports(port_low, port_high);
+      index_principals_.erase(port_low);
       principals_.erase(id);
       return -1;
     } catch (const web::json::json_exception& e) {
       log_err("create_principal, json error %s", e.what());
-      port_manager_->deallocate(prange.first);
-      index_principals_.erase(prange.first);
+      /// del reserved port
+      proxy_->del_reserved_ports(port_low, port_high);
+      index_principals_.erase(port_low);
       principals_.erase(id);
       return -2;
     } catch (const web::http::http_exception& e) {
       log_err("create_principal, http error %s", e.what());
-      port_manager_->deallocate(prange.first);
-      index_principals_.erase(prange.first);
+      /// del reserved port
+      proxy_->del_reserved_ports(port_low, port_high);
+      index_principals_.erase(port_low);
       principals_.erase(id);
       return -3;
     }
@@ -392,7 +409,17 @@ namespace latte {
   bool CoreManager::attest_principal_property(const std::string& ip,
       uint32_t port, const std::string& property) noexcept {
     try {
-      return client_->has_property(ip, port, property);
+      auto index = index_principals_.lower_bound(port);
+      auto ptr = index->second.lock();
+      if (!ptr) {
+        log_err("accessing dead principal with port %d\n", port);
+        return false;
+      }
+      if (ptr->lo() <= port && ptr->hi() > port) {
+        return client_->has_property(ip, port, property, ptr->bearer());
+      } else {
+        return false;
+      }
     } catch(const std::runtime_error& e) {
       log_err("attest_property, runtime error %s", e.what());
       return -1;
@@ -408,7 +435,17 @@ namespace latte {
   bool CoreManager::attest_principal_access(const std::string& ip,
       uint32_t port, const std::string& obj) noexcept {
     try {
-      return client_->can_access(ip, port, obj);
+      auto index = index_principals_.lower_bound(port);
+      auto ptr = index->second.lock();
+      if (!ptr) {
+        log_err("accessing dead principal with port %d\n", port);
+        return false;
+      }
+      if (ptr->lo() <= port && ptr->hi() > port) {
+        return client_->can_access(ip, port, obj, ptr->bearer());
+      } else {
+        return false;
+      }
     } catch(const std::runtime_error& e) {
       log_err("attest_access, runtime error %s", e.what());
       return -1;
@@ -435,8 +472,12 @@ namespace latte {
       }
       return -1;
     }
+    client_->remove_principal(
+        format_principal_id(record->second->id()),
+        myip_, record->second->lo(), record->second->hi(), record->second->image(),
+        record->second->configs());
     notify_deleted(K_PRINCIPAL, format_principal_id(uuid));
-    port_manager_->deallocate(record->second->lo());
+    fprintf(stderr, "debug: deleting reserved_ports\n");
     proxy_->del_reserved_ports(record->second->lo(), record->second->hi());
     index_principals_.erase(record->second->lo());
     principals_.erase(record);
@@ -578,7 +619,7 @@ static inline void register_fork_handle() {
 
 // This must be called if a process intends to become an attester. It will
 // clear stalled information (if any)
-int libport_init(const char *server_url, const char *persistence_path) {
+int libport_init(const char *server_url, const char *persistence_path, int run_as_iaas) {
   clear_stall_state();
   /// when to reinit??
   if (need_reinit_thread_pool) {
@@ -587,7 +628,12 @@ int libport_init(const char *server_url, const char *persistence_path) {
   // reinitialize the thread pool if needed
   pthread_once(&once, register_fork_handle);
   try {
-    std::string myip = latte::utils::get_myip();
+    std::string myip;
+    if (run_as_iaas) {
+      myip = IAAS_IDENTITY;
+    } else {
+      myip = latte::utils::get_myip();
+    }
     if (myip.compare("") == 0) {
       latte::log_err("failed to initialize libport principal identity");
       return -1;
@@ -617,11 +663,16 @@ int libport_init(const char *server_url, const char *persistence_path) {
   return 0;
 }
 
-int libport_reinit(const char *server_url, const char *persistence_path) {
+int libport_reinit(const char *server_url, const char *persistence_path, int run_as_iaas) {
   clear_stall_state();
   register_fork_handle();
   try {
-    std::string myip = latte::utils::get_myip();
+    std::string myip;
+    if (run_as_iaas) {
+      myip = IAAS_IDENTITY;
+    } else {
+      myip = latte::utils::get_myip();
+    }
     if (myip.compare("") == 0) {
       latte::log_err("failed to initialize libport principal identity");
       return -1;
@@ -687,16 +738,16 @@ int endorse_image(const char *image_hash, const char *endorsement) {
   return core->endorse_image(image_hash, endorsement);
 }
 
-bool attest_principal_property(const char *ip, uint32_t port, const char *prop) {
+int attest_principal_property(const char *ip, uint32_t port, const char *prop) {
   CHECK_LIB_INIT_BOOL;
   latte::log("attesting property: %s, %u, %s\n", ip, port, prop);
-  return core->attest_principal_property(ip, port, prop);
+  return core->attest_principal_property(ip, port, prop)? 1: 0;
 }
 
-bool attest_principal_access(const char *ip, uint32_t port, const char *obj) {
+int attest_principal_access(const char *ip, uint32_t port, const char *obj) {
   CHECK_LIB_INIT_BOOL;
   latte::log("attesting access: %s, %u, %s\n", ip, port, obj);
-  return core->attest_principal_access(ip, port, obj);
+  return core->attest_principal_access(ip, port, obj)? 1: 0;
 }
 
 int delete_principal(uint64_t uuid) {

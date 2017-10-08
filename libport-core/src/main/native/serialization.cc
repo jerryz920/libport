@@ -16,8 +16,8 @@ Principal Principal::parse(const std::string &data) {
 
 Principal Principal::from_json(web::json::value p) {
   return Principal(utils::atoi<uint64_t>(p["id"].as_string()),
-        utils::atoi<int>(p["lo"].as_string()), utils::atoi<int>(p["hi"].as_string()),
-        p["image"].as_string(), p["configs"].as_string());
+        utils::atoi<uint32_t>(p["lo"].as_string()), utils::atoi<uint32_t>(p["hi"].as_string()),
+        p["image"].as_string(), p["configs"].as_string(), p["bearer"].as_string());
 }
 
 web::json::value Principal::to_json() const {
@@ -27,6 +27,7 @@ web::json::value Principal::to_json() const {
   v["hi"] = web::json::value::string(utils::itoa(this->hi()));
   v["image"] = web::json::value::string(this->image());
   v["configs"] = web::json::value::string(this->configs());
+  v["bearer"] = web::json::value::string(this->bearer());
   return v;
 }
 

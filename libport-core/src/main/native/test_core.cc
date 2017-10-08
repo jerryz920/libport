@@ -21,7 +21,13 @@ namespace latte {
 
 class MockMetadataClient: public MetadataServiceClient {
   public:
-    MOCK_VOID_METHOD6(post_new_principal,
+    MOCK_METHOD6(std::string, post_new_principal,
+        const std::string&, principal_name,
+        const std::string&, principal_ip, int, port_min,
+        int, port_max, const std::string&, image_hash,
+        const std::string&, configs, override)
+
+    MOCK_VOID_METHOD6(remove_principal,
         const std::string&, principal_name,
         const std::string&, principal_ip, int, port_min,
         int, port_max, const std::string&, image_hash,
@@ -41,13 +47,15 @@ class MockMetadataClient: public MetadataServiceClient {
         const std::string&, image_hash,
         const std::string&, endorsement, override)
 
-    MOCK_METHOD3(bool, has_property,
+    MOCK_METHOD4(bool, has_property,
         const std::string&, principal_ip, int, port,
-        const std::string&, property, override)
+        const std::string&, property,
+        const std::string&, bearer, override)
 
-    MOCK_METHOD3(bool, can_access,
+    MOCK_METHOD4(bool, can_access,
         const std::string&, principal_ip, int, port,
-        const std::string&, access_object, override)
+        const std::string&, access_object, 
+        const std::string&, bearer, override)
 };
 
 class MockSyscallProxy :public SyscallProxy {
@@ -66,6 +74,23 @@ class MockSyscallProxy :public SyscallProxy {
     CALL_ARGS(get_local_ports).push_back(ARG_TYPE(get_local_ports)(lo, hi)); 
     printf("mock called\n");
     return RETURN_VALUE(get_local_ports); 
+  }
+
+  /// we should make this more elegant with things like DECL_METHODx
+  int64_t CALL_COUNT(alloc_child_ports) = 0;
+  int RETURN_VALUE(alloc_child_ports) = 0; 
+  typedef std::tuple< 
+    std::remove_reference<pid_t>::type, 
+    std::remove_reference<pid_t>::type,
+    int> ARG_TYPE(alloc_child_ports); 
+  std::list<ARG_TYPE(alloc_child_ports)> CALL_ARGS(alloc_child_ports); 
+  int alloc_child_ports(pid_t ppid, pid_t pid, int n) override {
+    static int cur = 15;
+    int to_return = cur;
+    cur = to_return + n;
+    CALL_COUNT(alloc_child_ports) += 1; 
+    CALL_ARGS(alloc_child_ports).push_back(ARG_TYPE(alloc_child_ports)(ppid, pid, n)); 
+    return to_return;
   }
 
   MOCK_METHOD3(int, set_child_ports, pid_t, pid, int, lo, int, hi, override)
@@ -125,6 +150,10 @@ class MockCoreManager: public CoreManager {
 
   MockMetadataClient* get_mock_metadata_client() {
     return dynamic_cast<MockMetadataClient*>(CoreManager::get_metadata_client());
+  }
+
+  MockSyscallProxy* get_mock_syscall_proxy() {
+    return dynamic_cast<MockSyscallProxy*>(CoreManager::get_syscall_proxy());
   }
 
   void set_new_config_root(web::json::value new_root) {
@@ -211,8 +240,10 @@ BOOST_AUTO_TEST_CASE(test_principal) {
   for (int i = 0; i < 5; i++) {
     BOOST_CHECK(m.has_principal(i));
   }
+  auto* mock_sysproxy = m.get_mock_syscall_proxy();
   auto* mock_client = m.get_mock_metadata_client();
   BOOST_CHECK_EQUAL(mock_client->post_new_principal_call_count, 5);
+  BOOST_CHECK_EQUAL(mock_sysproxy->alloc_child_ports_call_count, 5);
   int i = 0;
   for (auto it = mock_client->post_new_principal_call_args.begin();
       it != mock_client->post_new_principal_call_args.end(); ++it) {
@@ -236,6 +267,22 @@ BOOST_AUTO_TEST_CASE(test_principal) {
   BOOST_CHECK(!m.has_principal(2));
   for (int i = 3; i < 5; i++) {
     BOOST_CHECK(m.has_principal(i));
+  }
+  i = 0;
+  BOOST_CHECK_EQUAL(mock_sysproxy->del_reserved_ports_call_count, 3);
+  int call_indexes[3] = {1, 2, 0};
+  BOOST_CHECK_EQUAL(mock_client->remove_principal_call_count, 3);
+  for (auto it = mock_client->remove_principal_call_args.begin();
+      it != mock_client->remove_principal_call_args.end(); ++it) {
+    std::stringstream ss, ss1;
+    ss << "image" << call_indexes[i];
+    ss1 << "config" << call_indexes[i];
+    auto stri = latte::utils::itoa<int, latte::utils::HexType>(call_indexes[i]);
+    BOOST_CHECK_EQUAL(std::get<0>(*it), stri);
+    BOOST_CHECK_EQUAL(std::get<1>(*it), "192.168.0.1");
+    BOOST_CHECK_EQUAL(std::get<4>(*it), ss.str());
+    BOOST_CHECK_EQUAL(std::get<5>(*it), ss1.str());
+    i++;
   }
   /// it's returned by value so we need to obtain it again
   config_root = m.obtain_root();

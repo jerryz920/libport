@@ -38,7 +38,9 @@ int wait_principal(pid_t child) {
   } else {
     ret = -2;
   }
-  //::delete_principal(child);
+  fprintf(stderr, "before deleting child\n");
+  ::delete_principal(child);
+  fprintf(stderr, "after deleting child\n");
   return ret;
 }
 
@@ -74,8 +76,9 @@ int create_server_socket(int local_port) {
   return s;
 }
 
-bool client_try_access(int local_port) {
+bool client_try_access(int local_port, int expected_port_lo = -1, int expected_port_hi = -1) {
 
+  bool ret = true;
   int c = socket(AF_INET, SOCK_STREAM, 0);
   auto myip = latte::utils::get_myip();
   struct sockaddr_in addr = {
@@ -94,6 +97,10 @@ bool client_try_access(int local_port) {
   }
   getsockname(c, (struct sockaddr*) &my_addr, &my_addr_len);
   fprintf(stderr, "client socket seen port: %d\n", ntohs(my_addr.sin_port));
+  if (expected_port_lo != -1) {
+    auto port = ntohs(my_addr.sin_port);
+    ret = port >= expected_port_lo && port < expected_port_hi;
+  }
 
   char buf = 0;
   while (true) {
@@ -109,7 +116,7 @@ bool client_try_access(int local_port) {
     }
   }
   close(c);
-  return buf == 1;
+  return buf == 1 && ret;
 }
 
 
@@ -131,9 +138,10 @@ int reject_normal_child_task() {
 
 int attester_child_task() {
   /// works as attester, create a new attester with accepted image and try.
-  ::libport_init(server_url.c_str(), "/tmp/libport-integration-child.json");
+  ::libport_init(server_url.c_str(), "/tmp/libport-integration-child.json", 0);
   pid_t child;
   fprintf(stderr, "entering attester\n");
+  usleep(100000);
   if ((child = fork()) == 0) {
     /// child
     usleep(100000);
@@ -142,6 +150,7 @@ int attester_child_task() {
   } else {
     fprintf(stderr, "before create first principal \n");
     ::create_principal(child, "image_accept", "config_accept", 10);
+    fprintf(stderr, "this should be allowed, actual value: %d, should also not use child ports\n", client_try_access(local_abac_port));
     int ret = wait_principal(child);
     if (ret != 0) {
       fprintf(stderr, "ChildAttester: child that should be accepted returns %d\n", ret);
@@ -183,7 +192,7 @@ int main(int argc, char **argv) {
     SUSPEND("can not create monitor directory");
   }
 
-  if (::libport_init(server_url.c_str(), "/tmp/libport-integration.json")) {
+  if (::libport_init(server_url.c_str(), "/tmp/libport-integration.json", 1)) {
     SUSPEND("fail to init the libport");
   }
   bool terminate = false;
@@ -256,6 +265,7 @@ int main(int argc, char **argv) {
     }
   }
 
+  fprintf(stderr, "before forking new\n");
   // fork and simulate bad principal
   if ((child = fork()) == 0) {
     /// child

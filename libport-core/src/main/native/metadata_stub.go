@@ -102,6 +102,7 @@ func GetPrincipal(ip string) (*Principal, int) {
 		log.Errorf("error parsing IP: %s\n", ip)
 		return nil, http.StatusBadRequest
 	}
+	var found *Principal = nil
 	port, err := strconv.ParseInt(parts[1], 10, 32)
 	log.Infof("Looking for principal of %s-%d\n\n, current dicts: %v", parts[0], port,
 		store.Principals)
@@ -110,20 +111,23 @@ func GetPrincipal(ip string) (*Principal, int) {
 		return nil, http.StatusBadRequest
 	}
 	for _, p := range store.Principals {
-		if parts[0] != p.IP {
-			log.Infof("IP not matched")
-		}
-		if int(port) < p.PortMin {
-			log.Infof("Min port smaller!")
-		}
-		if int(port) > p.PortMax {
-			log.Infof("max port larger")
-		}
-		if parts[0] == p.IP && int(port) >= p.PortMin && int(port) <= p.PortMax {
-			return &p, http.StatusOK
+		// Find the deepest nested principal
+		tmp := p
+		if found == nil {
+			if parts[0] == p.IP && int(port) >= p.PortMin && int(port) <= p.PortMax {
+				found = &tmp
+			}
+		} else {
+			if parts[0] == p.IP && found.PortMin <= p.PortMin && found.PortMax >= p.PortMin {
+				found = &tmp
+			}
 		}
 	}
-	return nil, http.StatusNotFound
+	if found != nil {
+		return found, http.StatusOK
+	} else {
+		return nil, http.StatusNotFound
+	}
 
 }
 
@@ -292,9 +296,20 @@ func attestObjectAccess(w http.ResponseWriter, r *http.Request) {
 	LoggedWrite(w, []byte(`{"message" : "access denied"}`))
 }
 
+func retractInstanceSet(w http.ResponseWriter, r *http.Request) {
+	m, status := ReadRequest(r)
+	SetCommonHeader(w)
+	if status != http.StatusOK {
+		LoggedWriteHeader(w, status)
+		return
+	}
+	delete(store.Principals, m.OtherValues[0])
+}
+
 func main() {
 	server := myhttp.NewEchoServer()
 	server.AddRoute("/postInstanceSet", postInstanceSet)
+	server.AddRoute("/retractInstanceSet", retractInstanceSet)
 	server.AddRoute("/updateSubjectSet", updateSubjectSet)
 	server.AddRoute("/postAttesterImage", postAttesterImage)
 	server.AddRoute("/postImageProperty", postImageProperty)

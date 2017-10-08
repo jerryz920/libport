@@ -7,10 +7,10 @@ int main() {
   latte::MetadataServiceClient c("http://localhost:10011", "127.0.0.1:100-200");
   latte::setloglevel(LOG_DEBUG);
 
-  c.post_new_principal(
+  auto b1 = c.post_new_principal(
       "p1", "192.168.0.1", 1000, 2000,
       "image1", "no_config");
-  c.post_new_principal(
+  auto b2 = c.post_new_principal(
       "p2", "192.168.0.2", 1000, 2000,
       "image2", "no_config");
 
@@ -25,13 +25,17 @@ int main() {
   c.endorse_image("image2", "unhappy");
   c.post_object_acl("object1", "happy");
   c.post_object_acl("object2", "unhappy");
-  assert(c.has_property("192.168.0.1", 1005, "happy"));
-  assert(!c.has_property("192.168.0.1", 1005, "unhappy"));
-  assert(!c.has_property("192.168.0.1", 999, "happy"));
-  assert(c.has_property("192.168.0.2", 1005, "unhappy"));
-  assert(c.can_access("192.168.0.1", 1005, "object1"));
-  assert(!c.can_access("192.168.0.1", 1005, "object2"));
-  assert(!c.can_access("192.168.0.1", 999, "object1"));
-  assert(c.can_access("192.168.0.2", 1005, "object2"));
+  assert(c.has_property("192.168.0.1", 1005, "happy", b1));
+  assert(!c.has_property("192.168.0.1", 1005, "unhappy", b1));
+  assert(!c.has_property("192.168.0.1", 999, "happy", b1));
+  assert(c.has_property("192.168.0.2", 1005, "unhappy", b2));
+  assert(c.can_access("192.168.0.1", 1005, "object1", b1));
+  assert(!c.can_access("192.168.0.1", 1005, "object2", b1));
+  assert(!c.can_access("192.168.0.1", 999, "object1", b1));
+  assert(c.can_access("192.168.0.2", 1005, "object2", b2));
+  c.remove_principal(
+      "p1", "192.168.0.1", 1000, 2000,
+      "image1", "no_config");
+  assert(!c.can_access("192.168.0.1", 1005, "object1", b1));
   return 0;
 }

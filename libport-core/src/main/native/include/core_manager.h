@@ -61,6 +61,7 @@ class SyscallProxy {
     virtual int add_reserved_ports(int lo, int hi) = 0;
     virtual int del_reserved_ports(int lo, int hi) = 0;
     virtual int clear_reserved_ports() = 0;
+    virtual int alloc_child_ports(pid_t ppid, pid_t pid, int n) = 0;
 };
 
 class CoreManager {
@@ -76,7 +77,7 @@ class CoreManager {
       local_port_hi_(other.local_port_hi_),
       persistence_path_(std::move(other.persistence_path_)),
       client_(std::move(other.client_)),
-      port_manager_(std::move(other.port_manager_)),
+//      port_manager_(std::move(other.port_manager_)),
       index_principals_(std::move(other.index_principals_)),
       principals_(std::move(other.principals_)),
       images_(std::move(other.images_)),
@@ -93,7 +94,7 @@ class CoreManager {
       local_port_hi_ = other.local_port_hi_;
       persistence_path_ = std::move(other.persistence_path_);
       client_ = std::move(other.client_);
-      port_manager_ = std::move(other.port_manager_);
+      //port_manager_ = std::move(other.port_manager_);
       index_principals_ = std::move(other.index_principals_);
       principals_ = std::move(other.principals_);
       images_ = std::move(other.images_);
@@ -177,6 +178,10 @@ class CoreManager {
       proxy_.swap(s);
     }
 
+    inline SyscallProxy* get_syscall_proxy() const {
+      return proxy_.get();
+    }
+
     inline void set_new_config_root(web::json::value new_root) {
       config_root_ = std::move(new_root);
     }
@@ -213,7 +218,7 @@ class CoreManager {
     uint32_t local_port_hi_;
     std::string persistence_path_;
     std::unique_ptr<MetadataServiceClient> client_;
-    std::unique_ptr<PortManager> port_manager_;
+    //std::unique_ptr<PortManager> port_manager_;
     std::map<uint32_t, std::weak_ptr<Principal>> index_principals_;
     std::unordered_map<uint64_t, std::shared_ptr<Principal>> principals_;
     std::unordered_map<std::string, std::unique_ptr<Image>> images_;

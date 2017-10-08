@@ -48,17 +48,17 @@ extern "C" {
 //   args:
 //    * metadata_host: IP address or host name
 //    * metadata_service: port address of metadata service
-int libport_init(const char *server_url, const char *persistence_path);
-int libport_reinit(const char *server_url, const char *persistence_path);
+int libport_init(const char *server_url, const char *persistence_path, int run_as_iaas);
+int libport_reinit(const char *server_url, const char *persistence_path, int run_as_iaas);
 
 
-int create_principal(uint64_t uuid, const char *image, const char *string, int nport);
+int create_principal(uint64_t uuid, const char *image, const char *config, int nport);
 int create_image(const char *image_hash, const char *source_url,
     const char *source_rev, const char *misc_conf);
 int post_object_acl(const char *obj_id, const char *requirement);
 int endorse_image(const char *image_hash, const char *endorsement);
-bool attest_principal_property(const char *ip, uint32_t port, const char *prop);
-bool attest_principal_access(const char *ip, uint32_t port, const char *obj);
+int attest_principal_property(const char *ip, uint32_t port, const char *prop);
+int attest_principal_access(const char *ip, uint32_t port, const char *obj);
 
 /// delete_principal:
 //   * remove a principal, and withdraw the mapping, as well as
