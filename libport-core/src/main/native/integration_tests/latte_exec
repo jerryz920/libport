@@ -1,0 +1,3 @@
+#!/bin/bash
+usleep 100000
+exec $*

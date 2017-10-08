@@ -9,11 +9,15 @@ RUN cd /opt/ && bash install_lib.sh
 RUN apt-get install -y gdb strace vim
 RUN apt-get install -y rsyslog
 RUN cd /opt/net/casablanca/ && git pull origin dev && cd Release/build.release && make -j 5 install
+COPY setup_java.sh /opt/
+RUN cd /opt/ && bash step_java.sh
 COPY 50-default.conf /etc/rsyslog.d/
 RUN update-rc.d rsyslog defaults
 COPY test_core /opt/
 COPY test_integration /opt/
-COPY libport.so /usr/local/lib/
+COPY *.jar /opt/
+COPY libport.so /usr/lib/
+COPY latte_exec /usr/bin/
 RUN mkdir /data
 # only for debugging purpose
 RUN mkdir -p /openstack/git/libport/libport-core/src/main/native/
