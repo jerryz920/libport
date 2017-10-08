@@ -54,6 +54,10 @@ add_executable(test_metadata test_metadata.cc)
 #target_link_libraries(test_metadata boost_system crypto ssl cpprest port)
 target_link_libraries(test_metadata ${library_dependencies})
 
+add_executable(test_safe_metadata test_safe_metadata.cc)
+#target_link_libraries(test_metadata boost_system crypto ssl cpprest port)
+target_link_libraries(test_safe_metadata ${library_dependencies})
+
 if (NOT GOTOOL)
   MESSAGE("No go binary found, you may want to manual test this")
 else (NOT GOTOOL)
