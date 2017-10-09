@@ -4,6 +4,8 @@ project (libport)
 # The version number.
 set (libport_VERSION_MAJOR 1)
 set (libport_VERSION_MINOR 0)
+set (LIBPORT_INSTALL_PATH "/usr" CACHE PATH "prefix of installation")
+set (CMAKE_INSTALL_PREFIX ${LIBPORT_INSTALL_PATH} CACHE INTERNAL "prefix prepended to install directories" FORCE)
 add_definitions("-Wall -std=c++11")
 
 find_program(GOTOOL go)
@@ -70,5 +72,10 @@ endif (NOT GOTOOL)
 add_executable(test_integration test_integration.cc)
 target_link_libraries(test_integration -L/usr/local/lib ${library_dependencies})
 
+install(TARGETS port 
+  LIBRARY DESTINATION lib)
+
+install(FILES ${PROJECT_SOURCE_DIR}/include/libport.h
+  DESTINATION include)
 
 
