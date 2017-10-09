@@ -178,6 +178,9 @@ namespace latte {
         log_err("error quiting the sync thread: %s", e.what());
       }
     }
+    for (auto it: this->principals_) {
+      delete it.second;
+    }
   }
 
   void CoreManager::reinitialize_metadata_client() {
@@ -265,14 +268,15 @@ namespace latte {
       if (exec_path == "") {
         log("process %llu is not running! Syncing anyway\n", p.id());
       }
-      principals_[p.id()] = new Principal(std::move(p));
+      auto newp = new Principal(std::move(p));
+      principals_[newp->id()] = index_principals_[newp->lo()] = newp;
       /// We should guarantee this method is not paralleled with other process running
-      int err = proxy_->set_child_ports(p.id(), p.lo(), p.hi());
+      int err = proxy_->set_child_ports(newp->id(), newp->lo(), newp->hi());
       if (err != 0) {
-        log_err("can not recover the principal %llu with port %d-%d: %s\n",p.id(),
-            p.lo(), p.hi(), strerror(-err));
+        log_err("can not recover the principal %llu with port %d-%d: %s\n", newp->id(),
+            newp->lo(), newp->hi(), strerror(-err));
       } else {
-        proxy_->add_reserved_ports(p.lo(), p.hi());
+        proxy_->add_reserved_ports(newp->lo(), newp->hi());
       }
     }
   }
@@ -468,6 +472,7 @@ namespace latte {
     fprintf(stderr, "debug: deleting reserved_ports\n");
     proxy_->del_reserved_ports(record->second->lo(), record->second->hi());
     index_principals_.erase(record->second->lo());
+    delete record->second;
     principals_.erase(record);
     return 0;
   }
