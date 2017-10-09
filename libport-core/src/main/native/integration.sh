@@ -20,7 +20,7 @@ cd ..
 current=`pwd`
 cd ../../../../
 mvn package
-cp libport-dist/*.jar $current
+cp dist/libport-java-0.1.0-with-dependencies.jar $current/integration_tests/libport.jar
 
 cd $current/integration_tests
 eval $(docker-machine env ${1:-v1})

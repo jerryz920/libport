@@ -219,8 +219,10 @@ class CoreManager {
     std::string persistence_path_;
     std::unique_ptr<MetadataServiceClient> client_;
     //std::unique_ptr<PortManager> port_manager_;
-    std::map<uint32_t, std::weak_ptr<Principal>> index_principals_;
-    std::unordered_map<uint64_t, std::shared_ptr<Principal>> principals_;
+    //std::map<uint32_t, std::weak_ptr<Principal>> index_principals_;
+    //std::unordered_map<uint64_t, std::shared_ptr<Principal>> principals_;
+    std::map<uint32_t, Principal*> index_principals_;
+    std::unordered_map<uint64_t, Principal*> principals_;
     std::unordered_map<std::string, std::unique_ptr<Image>> images_;
     std::unordered_map<std::string, std::unique_ptr<AccessorObject>> accessors_;
     std::unique_ptr<std::mutex> write_lock_;

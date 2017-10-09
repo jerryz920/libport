@@ -210,11 +210,7 @@ namespace latte {
   }
   bool CoreManager::has_principal_by_port(uint32_t port) const {
     auto index = index_principals_.lower_bound(port);
-    auto ptr = index->second.lock();
-    if (!ptr) {
-      log_err("accessing dead principal with port %d\n", port);
-      return false;
-    }
+    auto ptr = index->second;
     return ptr->lo() <= port && ptr->hi() > port;
   }
   bool CoreManager::has_image(std::string hash) const {
@@ -269,7 +265,7 @@ namespace latte {
       if (exec_path == "") {
         log("process %llu is not running! Syncing anyway\n", p.id());
       }
-      principals_.emplace(p.id(), utils::make_unique<Principal>(std::move(p)));
+      principals_[p.id()] = new Principal(std::move(p));
       /// We should guarantee this method is not paralleled with other process running
       int err = proxy_->set_child_ports(p.id(), p.lo(), p.hi());
       if (err != 0) {
@@ -323,17 +319,15 @@ namespace latte {
     try {
       std::string bearer = client_->post_new_principal(format_principal_id(id), 
           myip_, port_low, port_high, image_hash, configs);
-      std::shared_ptr<Principal> newp = std::make_shared<Principal>(id,
+      Principal* newp = new Principal(id,
             port_low, port_high, image_hash, configs, bearer);
-      index_principals_[port_low] = std::weak_ptr<Principal>(newp);
-      std::weak_ptr<Principal> tmp(newp);
-      principals_[id] = std::move(newp);
+      index_principals_[port_low] = newp;
+      principals_[id] = newp;
 
       /// comment this off with alloc semantic
-      if (auto ref = tmp.lock()) {
+    log("before locking principal create");
         notify_created(K_PRINCIPAL, std::string(format_principal_id(id)),
-            ref->to_json());
-      }
+            newp->to_json());
     } catch (const std::runtime_error& e) {
       log_err("create_principal, runtime error %s", e.what());
       //port_manager_->deallocate(port_low);
@@ -410,11 +404,8 @@ namespace latte {
       uint32_t port, const std::string& property) noexcept {
     try {
       auto index = index_principals_.lower_bound(port);
-      auto ptr = index->second.lock();
-      if (!ptr) {
-        log_err("accessing dead principal with port %d\n", port);
-        return false;
-      }
+    log("before locking attest property");
+      auto ptr = index->second;
       if (ptr->lo() <= port && ptr->hi() > port) {
         return client_->has_property(ip, port, property, ptr->bearer());
       } else {
@@ -436,11 +427,8 @@ namespace latte {
       uint32_t port, const std::string& obj) noexcept {
     try {
       auto index = index_principals_.lower_bound(port);
-      auto ptr = index->second.lock();
-      if (!ptr) {
-        log_err("accessing dead principal with port %d\n", port);
-        return false;
-      }
+    log("before locking principal access");
+      auto ptr = index->second;
       if (ptr->lo() <= port && ptr->hi() > port) {
         return client_->can_access(ip, port, obj, ptr->bearer());
       } else {
@@ -579,6 +567,7 @@ static std::unique_ptr<latte::CoreManager> core = nullptr;
 static bool need_reinit_thread_pool = false;
 
 static void prepare_to_fork() {
+  latte::log("prepare to fork");
   if (core) {
     /// Thread pool must be cleared inside before fork.
     core->stop();
@@ -589,6 +578,7 @@ static void prepare_to_fork() {
 
 
 static void parent_after_fork() {
+  latte::log("after fork");
   crossplat::threadpool::reinit_shared();
   if (core) {
     core->reinitialize_metadata_client();
@@ -604,6 +594,7 @@ static void clear_stall_state() {
 }
 
 static void child_after_fork() {
+  latte::log("child after fork");
   clear_stall_state();
   /// make sure the reserved ports are cleared after fork... Why we 
   //even copy it in kernel?

@@ -1,3 +1,4 @@
 #!/bin/bash
 usleep 100000
+echo $* > exec_log.$$
 exec $*

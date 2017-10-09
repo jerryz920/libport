@@ -69,14 +69,16 @@
             "hi": "65505",
             "id": "0x3",
             "image": "image3",
-            "lo": "65495"
+            "lo": "65495",
+	    "bearer": "b1"
         },
         "0x4": {
             "configs": "config4",
             "hi": "65495",
             "id": "0x4",
             "image": "image4",
-            "lo": "65485"
+            "lo": "65485",
+	    "bearer": "b2"
         }
     }
 }

@@ -122,24 +122,24 @@ BOOST_AUTO_TEST_CASE(serialize_principal) {
 
 BOOST_AUTO_TEST_CASE(deserialize_principal) {
   std::string s1 = "{ \"id\": \"123\", \"lo\": \"100\", \"hi\": \"200\", \
-    \"image\": \"image_hash\", \"configs\":\"misc\"}";
+    \"image\": \"image_hash\", \"configs\":\"misc\", \"bearer\":\"b1\"}";
   auto v1 = latte::Principal::parse(s1);
   BOOST_CHECK_EQUAL(v1.id(), 123);
 
   std::string s2 = "{ \"id\": \"0x123\", \"lo\": \"100\", \"hi\": \"200\", \
-    \"image\": \"image_hash\", \"configs\":\"misc\"}";
+    \"image\": \"image_hash\", \"configs\":\"misc\", \"bearer\": \"b2\"}";
   auto v2 = latte::Principal::parse(s2);
   BOOST_CHECK_EQUAL(v2.id(), 0x123);
 
   std::string s_bad = "{ \"id\": \"bad\", \"lo\": \"100\", \"hi\": \"200\", \
-    \"image\": \"image_hash\", \"configs\":\"misc\"}";
+    \"image\": \"image_hash\", \"configs\":\"misc\", \"bearer\": \"b2\"}";
   BOOST_CHECK_THROW(latte::Principal::parse(s_bad), std::stringstream::failure);
 
   std::string s_bad1 = "{ \"id\": [], \"lo\": \"100\", \"hi\": \"200\", \
-    \"image\": \"image_hash\", \"configs\":\"misc\"}";
+    \"image\": \"image_hash\", \"configs\":\"misc\", \"bearer\": \"b2\"}";
   BOOST_CHECK_THROW(latte::Principal::parse(s_bad1), web::json::json_exception);
 
   std::string s_bad2 = "{ \"id\": {}, \"lo\": \"100\", \"hi\": \"200\", \
-    \"image\": \"image_hash\", \"configs\":\"misc\"}";
+    \"image\": \"image_hash\", \"configs\":\"misc\", \"bearer\": \"b2\"}";
   BOOST_CHECK_THROW(latte::Principal::parse(s_bad2), web::json::json_exception);
 }
