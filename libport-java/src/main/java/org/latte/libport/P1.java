@@ -8,8 +8,10 @@ import java.io.InputStreamReader;
 
 public class P1 {
     public static final int abacPort = PortManager.abacPort;
-    public static void main()
+    public static void main(String []args)
     {
+        int pid = LibC.INSTANCE.getpid();
+        Utils.reportLocalPorts("test-main" + pid);
         int value = 0;
         try {
             Socket s = new Socket("127.0.0.1", abacPort);

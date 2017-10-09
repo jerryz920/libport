@@ -8,6 +8,9 @@ import com.sun.jna.Native;
 public interface LibPort extends Library
 {
   LibPort INSTANCE = (LibPort) Native.loadLibrary("port", LibPort.class);
+  public static final int LOG_DEBUG = 7;
+  public static final int LOG_INFO = 6;
+  public static final int LOG_WARNING = 4;
   int libport_init(String server_url, String persistence_path, int run_as_iaas);
   int libport_reinit(String server_url, String persistence_path, int run_as_iaas);
 
@@ -18,5 +21,8 @@ public interface LibPort extends Library
   int endorse_image(String image_hash, String endorsement);
   int attest_principal_property(String ip, int port, String prop);
   int attest_principal_access(String ip, int port, String obj);
+  int delete_principal(long uuid);
+
+  void libport_set_log_level(int upto);
 }
 
