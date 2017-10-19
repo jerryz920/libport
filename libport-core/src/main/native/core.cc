@@ -329,9 +329,9 @@ namespace latte {
       principals_[id] = newp;
 
       /// comment this off with alloc semantic
-    log("before locking principal create");
-        notify_created(K_PRINCIPAL, std::string(format_principal_id(id)),
-            newp->to_json());
+      log("before locking principal create");
+      notify_created(K_PRINCIPAL, std::string(format_principal_id(id)),
+          newp->to_json());
     } catch (const std::runtime_error& e) {
       log_err("create_principal, runtime error %s", e.what());
       //port_manager_->deallocate(port_low);
@@ -355,7 +355,7 @@ namespace latte {
       principals_.erase(id);
       return -3;
     }
-    return 0;
+    return port_low;
   }
 
   int CoreManager::post_object_acl(const std::string& obj_id,

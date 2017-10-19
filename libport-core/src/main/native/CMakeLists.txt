@@ -16,7 +16,7 @@ find_library(CRYPTO crypto)
 find_package(Threads)
 # testing
 enable_testing()
-set(Boost_ADDITIONAL_VERSIONS "1.54" "1.54.0")
+set(Boost_ADDITIONAL_VERSIONS "1.54" "1.54.0" "1.53" "1.53.0" "1.55" "1.55.0")
 set(port_library_dependencies boost_system crypto ssl cpprest ${CMAKE_THREAD_LIBS_INIT})
 set(library_dependencies port boost_system crypto ssl cpprest ${CMAKE_THREAD_LIBS_INIT})
 
