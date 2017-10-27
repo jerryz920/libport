@@ -71,9 +71,9 @@ namespace {
   }
 
   inline std::string format_image_source(const std::string& source_url,
-      const std::string& source_rev, const std::string& misc_conf) {
+      const std::string& source_rev) {
     std::stringstream image_source_info;
-    image_source_info << source_url << "#" << source_rev << "#" << misc_conf;
+    image_source_info << source_url << "#" << source_rev ;
     return image_source_info.str();
   }
 
@@ -227,13 +227,13 @@ void MetadataServiceClient::post_new_image(const std::string& image_hash,
         const std::string& misc_conf) {
   /* FIXME: Using IAAS_IDENTITY should be a BUG but we will fix them later */
   this->post_statement("/postAttesterImage", IAAS_IDENTITY, 
-      {image_hash})
+      {image_hash, misc_conf})
     .then(debug_task())
     .then([&](web::http::http_response res) -> 
         pplx::task<web::http::http_response> {
         if (res.status_code() == web::http::status_codes::OK) {
           return this->post_statement("/postImageProperty", IAAS_IDENTITY, {
-              image_hash, format_image_source(source_url, source_rev, misc_conf)
+              image_hash, format_image_source(source_url, source_rev), misc_conf
               });
         } else{
           return pplx::task_from_exception<web::http::http_response>(
@@ -257,8 +257,8 @@ void MetadataServiceClient::post_object_acl(const std::string& object_id,
 }
 
 void MetadataServiceClient::endorse_image(const std::string& image_hash,
-    const std::string& endorsement) {
-  this->post_statement("/postImageProperty", myid(), {image_hash, endorsement})
+    const std::string& endorsement, const std::string& config) {
+  this->post_statement("/postImageProperty", myid(), {image_hash, config, endorsement})
     .then(debug_task())
     .then(sink_task("endorsing image")).wait();
 }

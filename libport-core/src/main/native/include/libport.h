@@ -57,6 +57,7 @@ int create_image(const char *image_hash, const char *source_url,
     const char *source_rev, const char *misc_conf);
 int post_object_acl(const char *obj_id, const char *requirement);
 int endorse_image(const char *image_hash, const char *endorsement);
+int endorse_image_new(const char *image_hash, const char *endorsement, const char *config);
 int attest_principal_property(const char *ip, uint32_t port, const char *prop);
 int attest_principal_access(const char *ip, uint32_t port, const char *obj);
 

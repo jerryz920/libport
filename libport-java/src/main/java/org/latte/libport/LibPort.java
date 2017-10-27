@@ -19,6 +19,7 @@ public interface LibPort extends Library
     String source_rev, String misc_conf);
   int post_object_acl(String obj_id, String requirement);
   int endorse_image(String image_hash, String endorsement);
+  int endorse_image_new(String image_hash, String endorsement, String config);
   int attest_principal_property(String ip, int port, String prop);
   int attest_principal_access(String ip, int port, String obj);
   int delete_principal(long uuid);

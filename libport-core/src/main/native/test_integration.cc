@@ -240,7 +240,7 @@ int main(int argc, char **argv) {
   }
 
   // Endorse image with new properties
-  if (::endorse_image("image_accept", "accept_property")) {
+  if (::endorse_image_new("image_accept", "accept_property", "config1")) {
     SUSPEND("fail to endorse image property");
   }
   // Create new object acls

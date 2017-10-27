@@ -84,7 +84,7 @@ class MetadataServiceClient {
     //    int port_max, const std::string& endorsement);
 
     virtual void endorse_image(const std::string& image_hash,
-        const std::string& endorsement);
+        const std::string& endorsement, const std::string& config);
 
     //void endorse_source(const std::string& source_url,
     //    const std::string& source_revision, const std::string& endorsement);

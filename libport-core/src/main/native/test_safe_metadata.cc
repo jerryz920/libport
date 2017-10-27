@@ -25,8 +25,8 @@ int main(int argc, char **argv) {
   c.post_new_image(
       "image2", "git://github.com/jerryz920/spark", "0x1235612",
       "no_config");
-  c.endorse_image("image1", "happy");
-  c.endorse_image("image2", "unhappy");
+  c.endorse_image("image1", "happy", "no_config");
+  c.endorse_image("image2", "unhappy", "no_config");
   latte::MetadataServiceClient alice(addr, "alice");
   alice.post_object_acl("alice:object1", "happy");
   alice.post_object_acl("alice:object2", "unhappy");
@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
   auto b3 = p2.post_new_principal("pp1", "192.168.0.2", 1050, 1100,
       "image3", "no_config");
   p2.post_new_image("image3", "git://github.com/jerryz920/pio", "0x4567123", "no_config");
-  p2.endorse_image("image3", "happy");
+  p2.endorse_image("image3", "happy", "no_config");
   assert(p2.has_property("192.168.0.2", 1050, "happy", b3));
   assert(p2.can_access("192.168.0.2", 1050, "alice:object1", b3));
 

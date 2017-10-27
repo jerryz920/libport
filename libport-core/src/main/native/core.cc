@@ -385,12 +385,12 @@ namespace latte {
   }
 
   int CoreManager::endorse_image(const std::string& image_hash,
-      const std::string& endorsement) noexcept {
+      const std::string& endorsement, const std::string& config) noexcept {
     try {
       if (images_.find(image_hash) == images_.cend()) {
         log("Endorsing remote image: %s", image_hash.c_str());
       }
-      client_->endorse_image(image_hash, endorsement);
+      client_->endorse_image(image_hash, endorsement, config);
     } catch(const std::runtime_error& e) {
       log_err("endorse_image, runtime error %s", e.what());
       return -1;
@@ -727,11 +727,16 @@ int post_object_acl(const char *obj_id, const char *requirement) {
   latte::log("posting obj acl: %s, %s\n", obj_id, requirement);
   return core->post_object_acl(obj_id, requirement);
 }
-
 int endorse_image(const char *image_hash, const char *endorsement) {
   CHECK_LIB_INIT;
-  latte::log("endorsing image: %s, %s\n", image_hash, endorsement);
-  return core->endorse_image(image_hash, endorsement);
+  latte::log("endorsing image: %s, %s, %s\n", image_hash, endorsement, "");
+  return core->endorse_image(image_hash, endorsement, "");
+}
+
+int endorse_image_new(const char *image_hash, const char *endorsement, const char *config) {
+  CHECK_LIB_INIT;
+  latte::log("endorsing image: %s, %s, %s\n", image_hash, endorsement, config);
+  return core->endorse_image(image_hash, endorsement, config);
 }
 
 int attest_principal_property(const char *ip, uint32_t port, const char *prop) {

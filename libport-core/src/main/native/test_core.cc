@@ -43,9 +43,10 @@ class MockMetadataClient: public MetadataServiceClient {
         const std::string&, obj_id,
         const std::string&, requirements, override)
 
-    MOCK_VOID_METHOD2(endorse_image,
+    MOCK_VOID_METHOD3(endorse_image,
         const std::string&, image_hash,
-        const std::string&, endorsement, override)
+        const std::string&, endorsement,
+        const std::string&, config, override)
 
     MOCK_METHOD4(bool, has_property,
         const std::string&, principal_ip, int, port,

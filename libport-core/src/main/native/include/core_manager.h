@@ -127,7 +127,7 @@ class CoreManager {
         const std::string& requirements) noexcept;
 
     int endorse_image(const std::string& image_hash,
-        const std::string& endorsement) noexcept;
+        const std::string& endorsement, const std::string& config) noexcept;
 
     bool attest_principal_property(const std::string& ip, uint32_t port,
         const std::string& prop) noexcept;

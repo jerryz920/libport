@@ -205,7 +205,7 @@ func postImageProperty(w http.ResponseWriter, r *http.Request) {
 	if i, ok := store.Images[m.OtherValues[0]]; !ok {
 		LoggedWriteHeader(w, http.StatusNotFound)
 	} else {
-		i.Properties[m.OtherValues[1]] = "set"
+		i.Properties[m.OtherValues[2]] = "set"
 		log.Infof("posting property %v for %s, image store: %v",
 			m.OtherValues[1], m.OtherValues[0], store.Images)
 
