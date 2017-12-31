@@ -14,19 +14,23 @@ find_library(CPPREST cpprest)
 find_library(SSL ssl)
 find_library(CRYPTO crypto)
 find_package(Threads)
+
 # testing
+add_subdirectory(proto)
 enable_testing()
 set(Boost_ADDITIONAL_VERSIONS "1.54" "1.54.0" "1.53" "1.53.0" "1.55" "1.55.0")
-set(port_library_dependencies boost_system crypto ssl cpprest ${CMAKE_THREAD_LIBS_INIT})
-set(library_dependencies port boost_system crypto ssl cpprest ${CMAKE_THREAD_LIBS_INIT})
+set(port_library_dependencies boost_system crypto ssl cpprest ${CMAKE_THREAD_LIBS_INIT} proto ${PROTOBUF_LIBRARY})
+set(library_dependencies port boost_system crypto ssl cpprest ${CMAKE_THREAD_LIBS_INIT} proto ${PROTOBUF_LIBRARY})
+
 
 add_library(port SHARED core.cc log.cc metadata.cc serialization.cc utils.cc)
 target_link_libraries(port ${port_library_dependencies})
 include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories(SYSTEM "/usr/local/include")
 
 
-add_executable(test_port_manager test_port_manager.cc)
+add_executable(test_port_manager test_port_manager.cc proto)
 target_include_directories(test_port_manager PRIVATE ${Boost_INCLUDE_DIRS} test-include)
 # indicates the shared library variant
 target_compile_definitions(test_port_manager PRIVATE "BOOST_TEST_DYN_LINK=1")

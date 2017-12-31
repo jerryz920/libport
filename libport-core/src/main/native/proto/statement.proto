@@ -1,0 +1,126 @@
+syntax = "proto3";
+package latte.proto;
+
+/// This file define protocol to reach attestation guard
+import "google/protobuf/any.proto";
+
+
+message AuthID {
+  	string ip = 1;
+	uint32 port = 2;
+	uint64 misc = 3;
+}
+
+message CodeID {
+  	string image = 1;
+	map<string, string> config = 2;
+	bool wildcard = 3; // config is wildcarded
+}
+
+message Endorsement {
+  	enum Type {
+	  MEMBERSHIP = 0;
+	  ATTESTER = 1;
+	  BUILDER = 2;
+	  SOURCE = 3;
+	  OTHER = 4; /// leave for future
+	}
+	Type type = 1;
+  	string property = 2;
+}
+
+message CreatePrincipal {
+  	uint64 id = 1;
+	uint64 gn = 2; // generation number
+	AuthID auth = 3;
+	CodeID code = 4;
+}
+
+message DeletePrincipal {
+  	uint64 id = 1;
+}
+
+message GetPrincipal {
+	AuthID id = 1;
+}
+
+message GetLocalPrincipal {
+  	uint64 id = 1;
+}
+
+message MetadataConfig {
+  	string ip = 1;
+	uint32 port = 2;
+}
+
+message EndorsePrincipal {
+  	AuthID id = 1;
+	uint64 gn = 2;
+	CodeID code = 3;
+	repeated Endorsement endorsements = 4;
+}
+
+message RevokePrincipal {
+  	AuthID id = 1;
+	uint64 gn = 2;
+	CodeID code = 3;
+	repeated Endorsement endorsements = 4;
+}
+
+message Endorse {
+  	string id = 1;
+	repeated Endorsement endorsements = 2;
+}
+
+message CheckProperty {
+  	AuthID id = 1;
+	repeated string properties = 2;
+}
+
+message CheckAccess {
+  	AuthID id = 1;
+	repeated string objects = 2;
+}
+
+message CheckAttestation {
+  	AuthID id = 1;
+}
+
+
+message Command {
+
+	int32 id = 1;
+	enum Type {
+	  CREATE_PRINCIPAL = 0;
+	  DELETE_PRINCIPAL = 1;
+	  /// not implemented
+	  ENDORSE_PRINCIPAL = 2;
+	  REVOKE_PRINCIPAL_ENDORSEMENT = 3;
+	  ENDORSE = 4;
+	  REVOKE = 5;
+	  GET_PRINCIPAL = 6;
+	  ///
+
+	  GET_LOCAL_PRINCIPAL = 20;
+	  GET_METADATA_CONFIG = 21;
+
+	  /// Some legacy things
+	  ENDORSE_MEMBERSHIP = 50;
+	  ENDORSE_ATTESTER_IMAGE = 51;
+	  ENDORSE_IMAGE_PROPERTY = 52;
+
+	  /// Some uninplemented stuff;
+	  ENDORSE_SOURCE = 53;
+
+	  /// Something to occur in logical engine but not in metadata service
+	  CHECK_PROPERTY = 100;
+	  CHECK_ATTESTATION = 101;
+	  CHECK_ACCESS = 102;
+	  POST_ACL = 103;
+	}
+
+	Type type = 2;
+	string auth = 3;
+
+	google.protobuf.Any statement = 4;
+}
