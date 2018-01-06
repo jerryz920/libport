@@ -42,6 +42,7 @@
 extern "C" {
 #endif 
 
+#define DEFAULT_DAEMON_PATH "/var/run/attguard.sock"
 /// init:
 //   * initialize the location of metadata service
 //   * fill in the local port and exclude range

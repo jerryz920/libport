@@ -7,8 +7,9 @@ import "google/protobuf/any.proto";
 
 message AuthID {
   	string ip = 1;
-	uint32 port = 2;
-	uint64 misc = 3;
+	uint32 port_lo = 2;
+        uint32 port_hi = 3;
+	uint64 misc = 4;
 }
 
 message CodeID {
@@ -29,23 +30,16 @@ message Endorsement {
   	string property = 2;
 }
 
-message CreatePrincipal {
+/// Both create, delete, get principal expect to extract
+// a principal message from the command body
+message Principal {
   	uint64 id = 1;
-	uint64 gn = 2; // generation number
+	uint64 gn = 2;
 	AuthID auth = 3;
 	CodeID code = 4;
 }
 
-message DeletePrincipal {
-  	uint64 id = 1;
-}
-
-message GetPrincipal {
-	AuthID id = 1;
-}
-
-message GetLocalPrincipal {
-  	uint64 id = 1;
+message Empty {
 }
 
 message MetadataConfig {
@@ -54,42 +48,46 @@ message MetadataConfig {
 }
 
 message EndorsePrincipal {
-  	AuthID id = 1;
-	uint64 gn = 2;
-	CodeID code = 3;
-	repeated Endorsement endorsements = 4;
+  	Principal principal = 1;
+	repeated Endorsement endorsements = 2;
 }
 
-message RevokePrincipal {
-  	AuthID id = 1;
-	uint64 gn = 2;
-	CodeID code = 3;
-	repeated Endorsement endorsements = 4;
-}
-
+//// TODO: rename this to EndorseStatic EndorseImageAndSource or something
+/// It's not the same things as Endorsement. Name is confusing.
 message Endorse {
   	string id = 1;
+        enum Type {
+          IMAGE = 0;
+          SOURCE = 1;
+        }
+        Type type = 3;
+        map<string, string> config = 4;
 	repeated Endorsement endorsements = 2;
 }
 
 message CheckProperty {
-  	AuthID id = 1;
+  	Principal principal = 1;
 	repeated string properties = 2;
 }
 
 message CheckAccess {
-  	AuthID id = 1;
+  	Principal principal = 1;
 	repeated string objects = 2;
 }
 
 message CheckAttestation {
-  	AuthID id = 1;
+  	Principal principal = 1;
+}
+
+message PostACL {
+        string name = 1;
+        repeated string policies = 2;
 }
 
 
 message Command {
 
-	int32 id = 1;
+	int64 id = 1;
 	enum Type {
 	  CREATE_PRINCIPAL = 0;
 	  DELETE_PRINCIPAL = 1;
@@ -110,7 +108,8 @@ message Command {
 	  ENDORSE_IMAGE_PROPERTY = 52;
 
 	  /// Some uninplemented stuff;
-	  ENDORSE_SOURCE = 53;
+	  ENDORSE_SOURCE_IMAGE = 53;
+          ENDORSE_BUILDER_IMAGE = 54;
 
 	  /// Something to occur in logical engine but not in metadata service
 	  CHECK_PROPERTY = 100;
@@ -124,3 +123,27 @@ message Command {
 
 	google.protobuf.Any statement = 4;
 }
+
+message Status {
+  	bool success = 1;
+	string info = 2;
+}
+
+message Attestation {
+        Principal principal = 1;
+        string content = 2;
+}
+
+message Response {
+	int64 id = 1;
+	enum Type {
+	  PRINCIPAL = 0;
+	  METADATA = 1;
+	  STATUS = 2;
+          ATTESTATION = 3;
+	}
+
+	Type type = 2;
+	google.protobuf.Any result = 3;
+}
+

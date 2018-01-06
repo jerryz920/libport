@@ -1,7 +1,6 @@
 /*
    The FreeBSD Copyright
-
-   Copyright 1992-2017 The FreeBSD Project. All rights reserved.
+Copyright 1992-2017 The FreeBSD Project. All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are met:
@@ -36,12 +35,14 @@
 
 #include <syslog.h>
 
+#define LOG_BUF_SIZE 8192
 namespace latte {
   bool is_debug();
   int loglevel();
   void setloglevel(int upto);
   void log(const char* msg, ...);
   void log_err(const char* msg, ...);
+  void log_err_throw(const char *msg, ...);
 }
 
 

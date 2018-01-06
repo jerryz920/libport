@@ -42,6 +42,8 @@
 #include <mutex>
 #include <thread>
 #include "cpprest/json.h"
+#include "utils.h"
+#include "port-syscall.h"
 
 
 namespace latte {
@@ -51,19 +53,6 @@ class AccessorObject;
 class Image;
 class MetadataServiceClient;
 class PortManager;
-
-class SyscallProxy {
-  public:
-    SyscallProxy() {}
-    virtual ~SyscallProxy() {}
-    virtual int set_child_ports(pid_t pid, int lo, int hi) = 0;
-    virtual int get_local_ports(int* lo, int *hi) = 0;
-    virtual int add_reserved_ports(int lo, int hi) = 0;
-    virtual int del_reserved_ports(int lo, int hi) = 0;
-    virtual int clear_reserved_ports() = 0;
-    virtual int alloc_child_ports(pid_t ppid, pid_t pid, int n) = 0;
-};
-
 class CoreManager {
 
   public:
@@ -140,7 +129,7 @@ class CoreManager {
     void save(const std::string& fpath) noexcept;
     static std::unique_ptr<CoreManager> from_disk(const std::string& fpath,
         const std::string &server_url, const std::string &myip);
-
+    static CoreManager& get_instance();
 
     // void delete_image();
     // void delete_principal();
@@ -222,9 +211,6 @@ class CoreManager {
     //std::map<uint32_t, std::weak_ptr<Principal>> index_principals_;
     //std::unordered_map<uint64_t, std::shared_ptr<Principal>> principals_;
     std::map<uint32_t, Principal*> index_principals_;
-    std::unordered_map<uint64_t, Principal*> principals_;
-    std::unordered_map<std::string, std::unique_ptr<Image>> images_;
-    std::unordered_map<std::string, std::unique_ptr<AccessorObject>> accessors_;
     std::unique_ptr<std::mutex> write_lock_;
     // the queue with on the fly syncing content
     std::vector< std::tuple<std::string, std::string, bool, web::json::value> > sync_q_;

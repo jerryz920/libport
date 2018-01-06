@@ -58,24 +58,6 @@ namespace {
     return result;
   }
 
-  inline std::string format_netaddr(const std::string& ip, int port) {
-    std::stringstream res;
-    res << ip << ":" << port;
-    return res.str();
-  }
-
-  inline std::string format_netaddr(const std::string& ip, int port_min, int port_max) {
-    std::stringstream res;
-    res << ip << ":" << port_min << "-" << port_max;
-    return res.str();
-  }
-
-  inline std::string format_image_source(const std::string& source_url,
-      const std::string& source_rev) {
-    std::stringstream image_source_info;
-    image_source_info << source_url << "#" << source_rev ;
-    return image_source_info.str();
-  }
 
 
   inline std::string consume_status(const web::http::http_response& res, const std::string& msg) {
@@ -185,7 +167,7 @@ std::string MetadataServiceClient::post_new_principal(const std::string& princip
 
   std::string identity;
   this->post_statement("/postInstanceSet", myid(), {principal_name, image_hash,
-      "image", format_netaddr(principal_ip, port_min, port_max), configs})
+      "image", utils::format_netaddr(principal_ip, port_min, port_max), configs})
     .then(debug_task())
     .then(json_task("creating principal"))
     .then([&](pplx::task<web::json::value> v) -> pplx::task<web::http::http_response> {
@@ -210,7 +192,7 @@ std::string MetadataServiceClient::post_new_principal(const std::string& princip
           }
           auto key = wrap.substr(start + 1, end - start - 1);
           identity = key;
-          return this->post_statement("/updateSubjectSet", format_netaddr(principal_ip, port_min,
+          return this->post_statement("/updateSubjectSet", utils::format_netaddr(principal_ip, port_min,
                 port_max), {key});
         } catch(std::runtime_error &e) {
           return pplx::task_from_exception<web::http::http_response>(
@@ -233,7 +215,7 @@ void MetadataServiceClient::post_new_image(const std::string& image_hash,
         pplx::task<web::http::http_response> {
         if (res.status_code() == web::http::status_codes::OK) {
           return this->post_statement("/postImageProperty", IAAS_IDENTITY, {
-              image_hash, format_image_source(source_url, source_rev), misc_conf
+              image_hash, utils::format_image_source(source_url, source_rev), misc_conf
               });
         } else{
           return pplx::task_from_exception<web::http::http_response>(
@@ -267,7 +249,7 @@ void MetadataServiceClient::endorse_image(const std::string& image_hash,
 bool MetadataServiceClient::has_property(const std::string& principal_ip,
     int port, const std::string& property, const std::string& bearer) {
   return this->post_statement("/attestAppProperty", ATTEST_IDENTITY, {
-      format_netaddr(principal_ip, port), property}, bearer)
+      utils::format_netaddr(principal_ip, port), property}, bearer)
     .then(debug_task())
     .then(json_task("attest property"))
     .then([](pplx::task<web::json::value> v) -> bool {
@@ -288,7 +270,7 @@ bool MetadataServiceClient::has_property(const std::string& principal_ip,
 bool MetadataServiceClient::can_access(const std::string& principal_ip, int port,
     const std::string& access_object, const std::string& bearer) {
   return this->post_statement("/appAccessesObject", ATTEST_IDENTITY, {
-      format_netaddr(principal_ip, port), access_object}, bearer)
+      utils::format_netaddr(principal_ip, port), access_object}, bearer)
     .then(debug_task())
     .then(json_task("attest access"))
     .then([](pplx::task<web::json::value> v) -> bool {
@@ -313,7 +295,7 @@ void MetadataServiceClient::remove_principal(
         const std::string& configs)
 {
   this->post_statement("/retractInstanceSet", myid(), {principal_name, image_hash,
-      "image", format_netaddr(principal_ip, port_min, port_max), configs})
+      "image", utils::format_netaddr(principal_ip, port_min, port_max), configs})
     .then(debug_task())
     .then(json_task("deleting principal")).wait();
 }

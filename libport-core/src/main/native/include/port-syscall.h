@@ -105,5 +105,64 @@ static inline int alloc_child_ports(pid_t ppid, pid_t pid, int n) {
 }
 #endif
 
+#include <fstream>
+
+class SyscallProxy {
+  public:
+    SyscallProxy() {}
+    virtual ~SyscallProxy() {}
+    virtual int set_child_ports(pid_t pid, int lo, int hi) = 0;
+    virtual int get_local_ports(int* lo, int *hi) = 0;
+    virtual int add_reserved_ports(int lo, int hi) = 0;
+    virtual int del_reserved_ports(int lo, int hi) = 0;
+    virtual int clear_reserved_ports() = 0;
+    virtual int alloc_child_ports(pid_t ppid, pid_t pid, int n) = 0;
+};
+
+
+class SyscallProxyImpl: public SyscallProxy {
+  public:
+    SyscallProxyImpl() {
+      /// system usually reserves 32768-60000 ports to process as client.
+      // Then if we update the port manager to 0-65535 then sometimes the set_local_port
+      // does not work as expected. Instead, we read out the available local ports and
+      // match it against get_child_ports
+      int lo, hi;
+      ::get_local_ports(&lo, &hi);
+
+      int syslo, syshi;
+      get_system_local_ports(&syslo, &syshi);
+
+      if (lo < syslo || hi > syshi) {
+        if (lo < syslo) lo = syslo;
+        if (hi > syshi) hi = syshi;
+        ::set_local_ports(lo, hi);
+      }
+    }
+
+    int set_child_ports(pid_t pid, int lo, int hi) override {
+      return ::set_child_ports(pid, lo, hi);
+    }
+    int get_local_ports(int* lo, int *hi) override {
+      return ::get_local_ports(lo, hi);
+    }
+    int add_reserved_ports(int lo, int hi) override {
+      return ::add_reserved_ports(lo, hi-1);
+    }
+    int del_reserved_ports(int lo, int hi) override {
+      return ::del_reserved_ports(lo, hi-1);
+    }
+    int clear_reserved_ports() override {
+      return ::clear_reserved_ports();
+    }
+    int alloc_child_ports(pid_t ppid, pid_t pid, int n) override {
+      return ::alloc_child_ports(ppid, pid, n);
+    }
+
+    void get_system_local_ports(int *lo, int *hi) {
+      std::ifstream f("/proc/sys/net/ipv4/ip_local_port_range");
+      f >> *lo >> *hi;
+    }
+};
 
 #endif

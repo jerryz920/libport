@@ -67,7 +67,9 @@ flags = [
 '-I',
 'include',
 '-I',
-'test-include'
+'test-include',
+'-I',
+'.'
 ]
 
 

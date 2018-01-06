@@ -93,50 +93,6 @@ std::string make_default_restore_path(pid_t p) {
   return ss.str();
 }
 
-class SyscallProxyImpl: public latte::SyscallProxy {
-  public:
-    SyscallProxyImpl() {
-      /// system usually reserves 32768-60000 ports to process as client.
-      // Then if we update the port manager to 0-65535 then sometimes the set_local_port
-      // does not work as expected. Instead, we read out the available local ports and
-      // match it against get_child_ports
-      int lo, hi;
-      ::get_local_ports(&lo, &hi);
-
-      int syslo, syshi;
-      get_system_local_ports(&syslo, &syshi);
-
-      if (lo < syslo || hi > syshi) {
-        if (lo < syslo) lo = syslo;
-        if (hi > syshi) hi = syshi;
-        ::set_local_ports(lo, hi);
-      }
-    }
-
-    int set_child_ports(pid_t pid, int lo, int hi) override {
-      return ::set_child_ports(pid, lo, hi);
-    }
-    int get_local_ports(int* lo, int *hi) override {
-      return ::get_local_ports(lo, hi);
-    }
-    int add_reserved_ports(int lo, int hi) override {
-      return ::add_reserved_ports(lo, hi-1);
-    }
-    int del_reserved_ports(int lo, int hi) override {
-      return ::del_reserved_ports(lo, hi-1);
-    }
-    int clear_reserved_ports() override {
-      return ::clear_reserved_ports();
-    }
-    int alloc_child_ports(pid_t ppid, pid_t pid, int n) override {
-      return ::alloc_child_ports(ppid, pid, n);
-    }
-
-    void get_system_local_ports(int *lo, int *hi) {
-      std::ifstream f("/proc/sys/net/ipv4/ip_local_port_range");
-      f >> *lo >> *hi;
-    }
-};
 
 }
 
@@ -571,6 +527,11 @@ namespace latte {
 static std::unique_ptr<latte::CoreManager> core = nullptr;
 static bool need_reinit_thread_pool = false;
 
+
+latte::CoreManager& latte::CoreManager::get_instance() {
+  return *core;
+}
+
 static void prepare_to_fork() {
   latte::log("prepare to fork");
   if (core) {
@@ -690,77 +651,4 @@ int libport_reinit(const char *server_url, const char *persistence_path, int run
   return 0;
 
 }
-
-#define CHECK_LIB_INIT \
-  if (!core) { \
-    latte::log_err("the library is not initialized");\
-    return -1; \
-  }
-
-#define CHECK_LIB_INIT_BOOL \
-  if (!core) { \
-    latte::log_err("the library is not initialized");\
-    return false; \
-  }
-
-int create_principal(uint64_t uuid, const char *image, const char *config,
-    int nport) {
-  // create principal, addresses are assgined by the library. Any statement
-  // appended will be included must be "const char*" type, which means String
-  // in Java. It will be included in misc config fields
-  CHECK_LIB_INIT;
-  latte::log("creating principal %llu, %s, %s, %d\n", uuid, image, config, nport);
-  return core->create_principal(uuid, image, config, nport);
-}
-
-
-int create_image(const char *image_hash, const char *source_url,
-    const char *source_rev, const char *misc_conf) {
-  CHECK_LIB_INIT;
-  latte::log("creating image %s, %s, %s, %s\n", image_hash, source_url,
-      source_rev, misc_conf);
-  return core->create_image(image_hash, source_url, source_rev, misc_conf);
-}
-
-int post_object_acl(const char *obj_id, const char *requirement) {
-  CHECK_LIB_INIT;
-  latte::log("posting obj acl: %s, %s\n", obj_id, requirement);
-  return core->post_object_acl(obj_id, requirement);
-}
-int endorse_image(const char *image_hash, const char *endorsement) {
-  CHECK_LIB_INIT;
-  latte::log("endorsing image: %s, %s, %s\n", image_hash, endorsement, "");
-  return core->endorse_image(image_hash, endorsement, "");
-}
-
-int endorse_image_new(const char *image_hash, const char *endorsement, const char *config) {
-  CHECK_LIB_INIT;
-  latte::log("endorsing image: %s, %s, %s\n", image_hash, endorsement, config);
-  return core->endorse_image(image_hash, endorsement, config);
-}
-
-int attest_principal_property(const char *ip, uint32_t port, const char *prop) {
-  CHECK_LIB_INIT_BOOL;
-  latte::log("attesting property: %s, %u, %s\n", ip, port, prop);
-  return core->attest_principal_property(ip, port, prop)? 1: 0;
-}
-
-int attest_principal_access(const char *ip, uint32_t port, const char *obj) {
-  CHECK_LIB_INIT_BOOL;
-  latte::log("attesting access: %s, %u, %s\n", ip, port, obj);
-  return core->attest_principal_access(ip, port, obj)? 1: 0;
-}
-
-int delete_principal(uint64_t uuid) {
-  CHECK_LIB_INIT_BOOL;
-  latte::log("deleting principal: %llu\n", uuid);
-  return core->delete_principal(uuid);
-}
-
-
-void libport_set_log_level(int upto) {
-  latte::setloglevel(upto);
-}
-
-
 
