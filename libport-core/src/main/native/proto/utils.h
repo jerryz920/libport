@@ -55,7 +55,7 @@ namespace proto{
         r_.swap(other.r_);
       }
 
-      static ResponseWrapper make_status_response(bool success, const std::string &msg) {
+      static Response* make_status_response(bool success, const std::string &msg) {
         Response* resp = Response::default_instance().New();
         resp->set_type(Response::Type::Response_Type_STATUS);
         Status status;
@@ -63,7 +63,7 @@ namespace proto{
         status.set_info(msg);
         auto result = resp->mutable_result();
         result->PackFrom(status);
-        return ResponseWrapper(resp);
+        return resp;
       }
 
       inline int status_int() const {

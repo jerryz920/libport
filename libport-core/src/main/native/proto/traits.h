@@ -17,6 +17,7 @@ template<> struct statement_traits<TYPE> { \
   typedef MSG_T msg_type; \
   typedef RES_T result_type; \
   static constexpr const char *name = #TYPE; \
+  static constexpr const uint32_t value = static_cast<uint32_t>(TYPE); \
 };
 
 
