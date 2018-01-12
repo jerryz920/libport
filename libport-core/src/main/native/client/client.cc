@@ -76,9 +76,10 @@ class AttGuardClient {
       return quick_post<proto::Command::CREATE_PRINCIPAL>(p);
     }
 
-    int delete_principal(uint64_t uuid) {
+    int delete_principal(uint64_t uuid, uint64_t gn) {
       proto::Principal p;
       p.set_id(uuid);
+      p.set_gn(gn);
       return quick_post<proto::Command::DELETE_PRINCIPAL>(p);
     }
 
@@ -278,14 +279,14 @@ class AttGuardClient {
       if (ret != 0) {
         std::stringstream err;
         err << "send failure, code " << ret;
-        return proto::ResponseWrapper::make_status_response(false, err.str());
+        return proto::make_status_response(false, err.str());
       }
       auto result = proto::Response::default_instance().New();
       ret = proto_recv_msg(sock_, result);
       if (ret != 0) {
         std::stringstream err;
         err << "recv failure" << ret;
-        return proto::ResponseWrapper::make_status_response(false, err.str());
+        return proto::make_status_response(false, err.str());
       }
       return proto::ResponseWrapper(result);
     }
@@ -443,10 +444,10 @@ int attest_principal_access(const char *ip, uint32_t port, const char *obj) {
   return latte_client->check_access(ip, port, obj);
 }
 
-int delete_principal(uint64_t uuid) {
+int delete_principal(uint64_t uuid, uint64_t gn) {
   CHECK_LIB_INIT;
-  latte::log("deleting principal: %llu\n", uuid);
-  return latte_client->delete_principal(uuid);
+  latte::log("deleting principal: %llu %llu\n", uuid, gn);
+  return latte_client->delete_principal(uuid, gn);
 }
 
 void libport_set_log_level(int upto) {

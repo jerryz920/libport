@@ -8,6 +8,10 @@
 #include "manager.h"
 #include "pplx/threadpool.h"
 #include "pplx/pplxtasks.h"
+#include "metadata.h"
+#include "utils.h"
+#include <jutils/config/simple.h>
+#include "config.h"
 
 
 namespace latte {
@@ -22,18 +26,37 @@ class LatteAttestationManager: public LatteDispatcher {
       LatteAttestationManager(metadata_server,crossplat::threadpool::shared_instance() ) {
     }
     LatteAttestationManager(const std::string &metadata_server,
-      crossplat::threadpool &pool): executor_(pool) {
+      crossplat::threadpool &pool): executor_(pool),
+      metadata_service_(utils::make_unique<MetadataServiceClient>(
+            metadata_server, latte::config::myid())) {
     }
 
     bool dispatch(std::shared_ptr<proto::Command> cmd, Writer w) override {
       auto handler = find_handler(cmd->type());
       std::shared_ptr<Response> result;
       if (handler) {
-
+        try {
+          result = handler(cmd);
+        } catch (const std::runtime_error &e) {
+          std::string errmsg = "runtime error " + std::string(e.what());
+          log_err(errmsg.c_str());
+          result = std::make_shared<proto::Response>(
+              proto::make_status_response(false, errmsg));
+        } catch (const web::json::json_exception &e) {
+          std::string errmsg = "json error " + std::string(e.what());
+          log_err(errmsg.c_str());
+          result = std::make_shared<proto::Response>(
+              proto::make_status_response(false, errmsg));
+        } catch(const web::http::http_exception &e) {
+          std::string errmsg = "http error " + std::string(e.what());
+          log_err(errmsg.c_str());
+          result = std::make_shared<proto::Response>(
+              proto::make_status_response(false, errmsg));
+        }
       } else {
         std::string typedesc = proto::Command::Type_Name(cmd->type());
         result = std::make_shared<proto::Response>(
-            proto::ResponseWrapper::make_status_response(false,
+            proto::make_status_response(false,
               "not handler found for type " + typedesc));
       }
       w(result);
@@ -100,78 +123,253 @@ class LatteAttestationManager: public LatteDispatcher {
     }
 
 
+    static inline std::string PrincipalName(const proto::Principal &p) {
+      std::stringstream ss;
+      ss << p.id() << ":" << p.gn();
+      return ss.str();
+    }
+
+
     std::shared_ptr<Response> create_principal(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto p = proto::CommandWrapper::extract_principal(*cmd);
+      if (!p) {
+        return proto::make_shared_status_response(false,
+              "principal not found or mal-formed");
+      }
+      auto res = metadata_service_->post_new_principal(PrincipalName(*p),
+          p->auth().ip(), p->auth().port_lo(), p->auth().port_hi(),
+          p->code().image(), p->code().config().at(LEGACY_CONFIG_KEY));
+      principals_.insert(std::make_pair(p->id(), p));
+      return proto::make_shared_status_response(true, "");
     }
 
     std::shared_ptr<Response> delete_principal(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto p = proto::CommandWrapper::extract_principal(*cmd);
+      if (!p) {
+        return proto::make_shared_status_response(false,
+              "principal not found or mal-formed");
+      }
+
+      uint64_t maxgn = 0;
+      std::shared_ptr<proto::Principal> latest = nullptr;
+      auto matched = principals_.equal_range(p->id());
+      for (auto i = matched.first; i != matched.second;) {
+        if (maxgn <= i->second->gn()) {
+          maxgn = i->second->gn();
+          latest = i->second;
+        }
+        if (i->second->gn() <= p->gn()) {
+          ///garbage collect... There should only be one process with largest gn
+          i = principals_.erase(i);
+        } else {
+          ++i;
+        }
+      }
+      //// authenticate if deletion is allowed!
+
+      /// deleting latest principal
+      if (latest) {
+        log("deleting principal: id = %u, maxgn = %u, pgn %u latest = %p, speaker = %u, pid = %u, uid = %u",
+            p->id(), maxgn, p->gn(), latest.get(), cmd->pid(), cmd->uid());
+        if (maxgn == p->gn() && 
+            (latest->speaker() == cmd->pid() || cmd->uid() == 0)) {
+          metadata_service_->remove_principal(PrincipalName(*latest),
+              latest->auth().ip(), latest->auth().port_lo(), latest->auth().port_hi(),
+              latest->code().image(), latest->code().config().at(LEGACY_CONFIG_KEY));
+        }
+      } else {
+        log("deleting %u, %u, latest principal not found", p->id(), p->gn());
+        return proto::make_shared_status_response(false,
+              "latest principal not found");
+      }
+
+      return std::shared_ptr<Response>(proto::make_status_response(true, ""));
+      return proto::make_shared_status_response(true, "");
     }
 
-    std::shared_ptr<Response> get_principal(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+    std::shared_ptr<Response> get_principal(std::shared_ptr<Command> ) {
+      /// not implemented yet
+      return proto::not_implemented();
     }
 
-    std::shared_ptr<Response> endorse_principal(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+    std::shared_ptr<Response> endorse_principal(std::shared_ptr<Command> ) {
+      /// not implemented yet
+      return proto::not_implemented();
     }
 
-    std::shared_ptr<Response> revoke_principal(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+    std::shared_ptr<Response> revoke_principal(std::shared_ptr<Command> ) {
+      /// not implemented yet
+      return proto::not_implemented();
     }
 
     std::shared_ptr<Response> endorse(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto endorse = proto::CommandWrapper::extract_endorse(*cmd);
+      if (endorse->type() == proto::Endorse::SOURCE) {
+        return proto::not_implemented();
+      }
+      if (endorse->endorsements_size() == 0) {
+        return proto::make_shared_status_response(false,
+            "must provide at least one property");
+      }
+      auto &image = endorse->id();
+      auto &property = endorse->endorsements(0).property();
+      auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
+      metadata_service_->endorse_image(image, property, config);
+      return proto::make_shared_status_response(true, "");
     }
 
-    std::shared_ptr<Response> revoke(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+    std::shared_ptr<Response> revoke(std::shared_ptr<Command> ) {
+      return proto::not_implemented();
     }
 
     std::shared_ptr<Response> get_local_principal(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto p = proto::CommandWrapper::extract_principal(*cmd);
+      if (!p) {
+        return proto::make_shared_status_response(false,
+              "principal not found or mal-formed");
+      }
+
+      uint64_t maxgn = 0;
+      std::shared_ptr<proto::Principal> latest = nullptr;
+      auto matched = principals_.equal_range(p->id());
+      for (auto i = matched.first; i != matched.second;) {
+        if (maxgn <= i->second->gn()) {
+          maxgn = i->second->gn();
+          latest = i->second;
+        }
+        if (i->second->gn() <= p->gn()) {
+          ///garbage collect... There should only be one process with largest gn
+          i = principals_.erase(i);
+        } else {
+          ++i;
+        }
+      }
+      if (maxgn == p->gn() && latest) {
+        return proto::make_shared_principal_response(*latest);
+      } else {
+        return proto::make_shared_status_response(false, "not found");
+      }
     }
 
-    std::shared_ptr<Response> get_metadata_config(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+    std::shared_ptr<Response> get_metadata_config(std::shared_ptr<Command>) {
+      proto::MetadataConfig config;
+      config.set_ip(config::metadata_service_ip());
+      config.set_port(config::metadata_service_port());
+      return proto::make_shared_metadata_config_response(config);
     }
 
     ////////////////////Legacy APIs
     std::shared_ptr<Response> post_acl(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto acl = proto::CommandWrapper::extract_post_acl(*cmd);
+      /// we only use the first name
+      if (acl->policies_size() == 0) {
+        return proto::make_shared_status_response(false, "must provide one policy");
+      }
+      metadata_service_->post_object_acl(acl->name(), acl->policies(0));
+      return proto::make_shared_status_response(true, "");
     }
 
     std::shared_ptr<Response> endorse_membership(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto endorse_p = proto::CommandWrapper::extract_endorse_principal(*cmd);
+      if (endorse_p->endorsements_size() == 0) {
+        return proto::make_shared_status_response(false, "must provide one endorsement");
+      }
+      auto &target_ip = endorse_p->principal().auth().ip();
+      auto target_port = endorse_p->principal().auth().port_lo();
+      auto &statement = endorse_p->endorsements(0);
+      metadata_service_->endorse_membership(target_ip, target_port, statement.property());
+      return proto::make_shared_status_response(true, "");
     }
 
     std::shared_ptr<Response> endorse_attester(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto endorse = proto::CommandWrapper::extract_endorse(*cmd);
+      auto id = endorse->id();
+      auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
+      if (endorse->type() == proto::Endorse::SOURCE) {
+        /// metadata_service_->endorse_source(id, statement);
+        metadata_service_->endorse_attester_on_source(id, config);
+      } else {
+        //// Need add a type
+        metadata_service_->endorse_attester(id, config);
+      }
+      return proto::make_shared_status_response(true, "");
     }
 
     std::shared_ptr<Response> endorse_builder(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto endorse = proto::CommandWrapper::extract_endorse(*cmd);
+      auto id = endorse->id();
+      if (endorse->endorsements_size() == 0) {
+        return proto::make_shared_status_response(false, "must provide one endorsement");
+      }
+      auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
+      if (endorse->type() == proto::Endorse::SOURCE) {
+        /// metadata_service_->endorse_source(id, statement);
+        metadata_service_->endorse_builder_on_source(id, config);
+      } else {
+        //// Need add a type
+        metadata_service_->endorse_builder(id, config);
+      }
+      return proto::make_shared_status_response(true, "");
     }
 
     std::shared_ptr<Response> endorse_source(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto endorse = proto::CommandWrapper::extract_endorse(*cmd);
+      auto id = endorse->id();
+      if (endorse->endorsements_size() == 0) {
+        return proto::make_shared_status_response(false, "must provide one endorsement");
+      }
+      auto &statement = endorse->endorsements(0);
+      auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
+      if (endorse->type() == proto::Endorse::SOURCE) {
+        /// metadata_service_->endorse_source(id, statement);
+        return proto::make_shared_status_response(false, "source endorse this is image only");
+      } else {
+        //// Need add a type
+        metadata_service_->endorse_image(id, statement.property(), config);
+      }
+      return proto::make_shared_status_response(true, "");
     }
 
     std::shared_ptr<Response> check_property(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto check = proto::CommandWrapper::extract_check_property(*cmd);
+      auto &ip = check->principal().auth().ip();
+      auto port = check->principal().auth().port_lo();
+      auto &prop = check->properties(0);
+      if (check->properties_size() == 0) {
+        return proto::make_shared_status_response(false, "must provide one property");
+      }
+      return proto::make_shared_status_response(
+          metadata_service_->can_access(ip, port, prop, ""), "");
     }
 
     std::shared_ptr<Response> check_attestation(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto attest = proto::CommandWrapper::extract_check_attestation(*cmd);
+      auto &ip = attest->principal().auth().ip();
+      auto port = attest->principal().auth().port_lo();
+      proto::Attestation a;
+      a.set_content(metadata_service_->attest(ip, port, ""));
+      return proto::make_shared_attestation_response(a);
     }
 
     std::shared_ptr<Response> check_access(std::shared_ptr<Command> cmd) {
-      return std::shared_ptr<Response>();
+      auto check = proto::CommandWrapper::extract_check_access(*cmd);
+      auto &ip = check->principal().auth().ip();
+      auto port = check->principal().auth().port_lo();
+      if (check->objects_size() == 0) {
+        return proto::make_shared_status_response(false, "must provide one object");
+      }
+      auto &object = check->objects(0);
+      return proto::make_shared_status_response(
+          metadata_service_->can_access(ip, port, object, ""), "");
     }
+
 
     std::unordered_map<uint32_t, Handler> dispatch_table_;
     crossplat::threadpool & executor_;
+    std::unique_ptr<MetadataServiceClient> metadata_service_;
 
+    std::unordered_multimap<uint64_t, std::shared_ptr<proto::Principal>> principals_;
+    /// maybe we could use image but not now I think.
 
 };
 

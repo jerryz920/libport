@@ -86,6 +86,24 @@ class MetadataServiceClient {
     virtual void endorse_image(const std::string& image_hash,
         const std::string& endorsement, const std::string& config);
 
+    virtual void endorse_attester(const std::string &image_id,
+        const std::string &config);
+
+    virtual void endorse_builder(const std::string &image_id,
+        const std::string &config);
+
+    virtual void endorse_membership(const std::string &ip, uint32_t port,
+        const std::string &endorse);
+
+    virtual void endorse_attester_on_source(const std::string &source_id,
+        const std::string &config);
+
+    virtual void endorse_builder_on_source(const std::string &source_id,
+        const std::string &config);
+
+    virtual void endorse_source(const std::string &image_id,
+        const std::string &config, const std::string &source);
+
     //void endorse_source(const std::string& source_url,
     //    const std::string& source_revision, const std::string& endorsement);
 
@@ -94,6 +112,8 @@ class MetadataServiceClient {
         const std::string& property, const std::string& bearer_ref);
     virtual bool can_access(const std::string& principal_ip, int port,
         const std::string& access_object, const std::string& bearer_ref);
+    virtual std::string attest(const std::string &principal_ip, uint32_t port,
+        const std::string &bearer);
 
     const std::string& myid() const { return myid_; }
 

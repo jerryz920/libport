@@ -68,8 +68,7 @@ void Session::command_received(const boost::system::error_code &ec, size_t len, 
       if (len > RECV_BUFSZ) {
       clear_large_rcv_buffer(); 
       }
-      }
-      );
+    });
   if (ec) {
     log("error in receving command: %s", ec.message().c_str());
     stop();
@@ -83,6 +82,9 @@ void Session::command_received(const boost::system::error_code &ec, size_t len, 
   }
   /// process should be async processing in fact.
   /// Response resp = process_cmd(command)
+  result->set_pid(pid_);
+  result->set_uid(uid_);
+  result->set_gid(gid_);
   dispatcher_->dispatch(result, std::bind(&Session::write_response,
         shared_from_this(), std::placeholders::_1));
 }

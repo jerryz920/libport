@@ -10,6 +10,7 @@ message AuthID {
 	uint32 port_lo = 2;
         uint32 port_hi = 3;
 	uint64 misc = 4;
+	string safe_id = 100;
 }
 
 message CodeID {
@@ -35,6 +36,7 @@ message Endorsement {
 message Principal {
   	uint64 id = 1;
 	uint64 gn = 2;
+	uint64 speaker = 5;
 	AuthID auth = 3;
 	CodeID code = 4;
 }
@@ -120,6 +122,9 @@ message Command {
 
 	Type type = 2;
 	string auth = 3;
+        uint64 pid = 5;
+        uint64 uid = 6;
+        uint64 gid = 7;
 
 	google.protobuf.Any statement = 4;
 }

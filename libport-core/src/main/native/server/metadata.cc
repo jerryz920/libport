@@ -203,6 +203,7 @@ std::string MetadataServiceClient::post_new_principal(const std::string& princip
     return identity;
 }
 
+
 void MetadataServiceClient::post_new_image(const std::string& image_hash,
         const std::string& source_url,
         const std::string& source_rev,
@@ -245,6 +246,52 @@ void MetadataServiceClient::endorse_image(const std::string& image_hash,
     .then(sink_task("endorsing image")).wait();
 }
 
+void MetadataServiceClient::endorse_membership(const std::string &ip,
+    uint32_t port, const std::string &property) {
+  this->post_statement("/postWorkerSet", myid(), {
+      utils::format_netaddr(ip, port), property})
+    .then(debug_task())
+    .then(sink_task("endorsing membership")).wait();
+}
+
+void MetadataServiceClient::endorse_builder_on_source(const std::string &source_id,
+    const std::string &config) {
+  this->post_statement("/postSourceImage", IAAS_IDENTITY, 
+      {source_id, config})
+    .then(debug_task())
+    .then(sink_task("endorsing builder")).wait();
+}
+
+void MetadataServiceClient::endorse_builder(const std::string &image_id,
+    const std::string &config) {
+  this->post_statement("/postBuilderImage", IAAS_IDENTITY, 
+      {image_id, config})
+    .then(debug_task())
+    .then(sink_task("endorsing builder")).wait();
+}
+void MetadataServiceClient::endorse_attester_on_source(const std::string &source_id,
+    const std::string &config) {
+  this->post_statement("/postAttesterSource", IAAS_IDENTITY, 
+      {source_id, config})
+    .then(debug_task())
+    .then(sink_task("endorsing attester")).wait();
+}
+
+void MetadataServiceClient::endorse_attester(const std::string &image_id,
+    const std::string &config) {
+  this->post_statement("/postAttesterImage", IAAS_IDENTITY, 
+      {image_id, config})
+    .then(debug_task())
+    .then(sink_task("endorsing attester")).wait();
+}
+
+void MetadataServiceClient::endorse_source(const std::string &image_id,
+    const std::string &config, const std::string &source) {
+  this->post_statement("/postImageSource", IAAS_IDENTITY, 
+      {image_id, config, source})
+    .then(debug_task())
+    .then(sink_task("endorsing source")).wait();
+}
 
 bool MetadataServiceClient::has_property(const std::string& principal_ip,
     int port, const std::string& property, const std::string& bearer) {
@@ -284,6 +331,27 @@ bool MetadataServiceClient::can_access(const std::string& principal_ip, int port
       } catch (std::runtime_error &e) {
         /// we alreay caught it, no need to do again
         return false;
+      }
+    }).get();
+}
+
+std::string MetadataServiceClient::attest(const std::string &ip,
+    uint32_t port, const std::string &bearer) {
+  return this->post_statement("/attestInstance", ATTEST_IDENTITY, {
+      utils::format_netaddr(ip, port)}, bearer)
+    .then(debug_task())
+    .then(json_task("attest instance"))
+    .then([](pplx::task<web::json::value> v) -> std::string {
+      try {
+        auto msg = v.get()["message"].as_string();
+        if (msg.find("approveAccess") == std::string::npos) {
+          log("not approving access: %s", msg.c_str());
+          return "";
+        }
+        return msg;
+      } catch (std::runtime_error &e) {
+        /// we alreay caught it, no need to do again
+        return "";
       }
     }).get();
 }
