@@ -22,6 +22,8 @@ using proto::Command;
 class LatteAttestationManager: public LatteDispatcher {
 
   public:
+    typedef std::unordered_multimap<uint64_t, std::shared_ptr<proto::Principal>> PrincipalMap;
+
     LatteAttestationManager(const std::string &metadata_server):
       LatteAttestationManager(metadata_server,crossplat::threadpool::shared_instance() ) {
     }
@@ -29,6 +31,16 @@ class LatteAttestationManager: public LatteDispatcher {
       crossplat::threadpool &pool): executor_(pool),
       metadata_service_(utils::make_unique<MetadataServiceClient>(
             metadata_server, latte::config::myid())) {
+          init();
+    }
+    LatteAttestationManager(std::unique_ptr<MetadataServiceClient> service):
+      LatteAttestationManager(std::move(service),crossplat::threadpool::shared_instance()) {
+    }
+
+    LatteAttestationManager(std::unique_ptr<MetadataServiceClient> service,
+        crossplat::threadpool &pool): executor_(pool),
+        metadata_service_(std::move(service)) {
+          init();
     }
 
     bool dispatch(std::shared_ptr<proto::Command> cmd, Writer w) override {
@@ -85,7 +97,8 @@ class LatteAttestationManager: public LatteDispatcher {
     }
 
 
-    void init() {
+    void init(uint64_t init_gn = 0) {
+      gn_ = init_gn;
       register_handler(proto::Command::CREATE_PRINCIPAL, 
           &LatteAttestationManager::create_principal);
       register_handler(proto::Command::DELETE_PRINCIPAL, 
@@ -123,7 +136,7 @@ class LatteAttestationManager: public LatteDispatcher {
     }
 
 
-    static inline std::string PrincipalName(const proto::Principal &p) {
+    static inline std::string principal_name(const proto::Principal &p) {
       std::stringstream ss;
       ss << p.id() << ":" << p.gn();
       return ss.str();
@@ -136,10 +149,11 @@ class LatteAttestationManager: public LatteDispatcher {
         return proto::make_shared_status_response(false,
               "principal not found or mal-formed");
       }
-      auto res = metadata_service_->post_new_principal(PrincipalName(*p),
+      p->set_gn(gn());
+      auto res = metadata_service_->post_new_principal(principal_name(*p),
           p->auth().ip(), p->auth().port_lo(), p->auth().port_hi(),
           p->code().image(), p->code().config().at(LEGACY_CONFIG_KEY));
-      principals_.insert(std::make_pair(p->id(), p));
+      add_principal(p->id(), p);
       return proto::make_shared_status_response(true, "");
     }
 
@@ -152,6 +166,7 @@ class LatteAttestationManager: public LatteDispatcher {
 
       uint64_t maxgn = 0;
       std::shared_ptr<proto::Principal> latest = nullptr;
+      plock_.lock();
       auto matched = principals_.equal_range(p->id());
       for (auto i = matched.first; i != matched.second;) {
         if (maxgn <= i->second->gn()) {
@@ -171,20 +186,28 @@ class LatteAttestationManager: public LatteDispatcher {
       if (latest) {
         log("deleting principal: id = %u, maxgn = %u, pgn %u latest = %p, speaker = %u, pid = %u, uid = %u",
             p->id(), maxgn, p->gn(), latest.get(), cmd->pid(), cmd->uid());
+        auto speaker = latest->speaker();
+        auto name = principal_name(*latest);
+        auto ip = latest->auth().ip();
+        auto plo = latest->auth().port_lo();
+        auto phi = latest->auth().port_hi();
+        auto image = latest->code().image();
+        auto config = latest->code().config().at(LEGACY_CONFIG_KEY);
+
+        plock_.unlock();
         if (maxgn == p->gn() && 
-            (latest->speaker() == cmd->pid() || cmd->uid() == 0)) {
-          metadata_service_->remove_principal(PrincipalName(*latest),
-              latest->auth().ip(), latest->auth().port_lo(), latest->auth().port_hi(),
-              latest->code().image(), latest->code().config().at(LEGACY_CONFIG_KEY));
+            (speaker == cmd->pid() || cmd->uid() == 0)) {
+          metadata_service_->remove_principal(name, ip, plo, phi, image,
+              config);
         }
+        return proto::make_shared_status_response(true, "");
       } else {
+        plock_.unlock();
         log("deleting %u, %u, latest principal not found", p->id(), p->gn());
         return proto::make_shared_status_response(false,
               "latest principal not found");
       }
 
-      return std::shared_ptr<Response>(proto::make_status_response(true, ""));
-      return proto::make_shared_status_response(true, "");
     }
 
     std::shared_ptr<Response> get_principal(std::shared_ptr<Command> ) {
@@ -231,6 +254,7 @@ class LatteAttestationManager: public LatteDispatcher {
 
       uint64_t maxgn = 0;
       std::shared_ptr<proto::Principal> latest = nullptr;
+      std::lock_guard<std::mutex> guard(plock_);
       auto matched = principals_.equal_range(p->id());
       for (auto i = matched.first; i != matched.second;) {
         if (maxgn <= i->second->gn()) {
@@ -276,8 +300,10 @@ class LatteAttestationManager: public LatteDispatcher {
       }
       auto &target_ip = endorse_p->principal().auth().ip();
       auto target_port = endorse_p->principal().auth().port_lo();
+      auto &target_config = endorse_p->principal().code().config().at(LEGACY_CONFIG_KEY);
       auto &statement = endorse_p->endorsements(0);
-      metadata_service_->endorse_membership(target_ip, target_port, statement.property());
+      metadata_service_->endorse_membership(target_ip, target_port, statement.property(),
+          target_config);
       return proto::make_shared_status_response(true, "");
     }
 
@@ -363,12 +389,34 @@ class LatteAttestationManager: public LatteDispatcher {
           metadata_service_->can_access(ip, port, object, ""), "");
     }
 
+    std::shared_ptr<Response> check_worker_access(std::shared_ptr<Command> cmd) {
+      auto check = proto::CommandWrapper::extract_check_access(*cmd);
+      auto &ip = check->principal().auth().ip();
+      auto port = check->principal().auth().port_lo();
+      if (check->objects_size() == 0) {
+        return proto::make_shared_status_response(false, "must provide one object");
+      }
+      auto &object = check->objects(0);
+      return proto::make_shared_status_response(
+          metadata_service_->can_worker_access(ip, port, object, ""), "");
+    }
+
+    void add_principal(uint64_t id, std::shared_ptr<proto::Principal> p) {
+      std::lock_guard<std::mutex> guard(plock_);
+      principals_.insert(std::make_pair(id, std::move(p)));
+    }
+
+    uint64_t gn() {
+      return gn_++;
+    }
 
     std::unordered_map<uint32_t, Handler> dispatch_table_;
     crossplat::threadpool & executor_;
     std::unique_ptr<MetadataServiceClient> metadata_service_;
 
-    std::unordered_multimap<uint64_t, std::shared_ptr<proto::Principal>> principals_;
+    std::mutex plock_;
+    PrincipalMap principals_;
+    uint64_t gn_;
     /// maybe we could use image but not now I think.
 
 };
@@ -382,6 +430,11 @@ void init_manager(const std::string &metadata_url) {
 void init_manager(const std::string &metadata_url, crossplat::threadpool &pool) {
   instance = std::make_shared<LatteAttestationManager>(metadata_url, pool);
 }
+
+void init_manager(MetadataServiceClient *client) {
+  instance = std::make_shared<LatteAttestationManager>(client);
+}
+
 
 std::shared_ptr<LatteDispatcher> get_manager() {
   if (instance) {

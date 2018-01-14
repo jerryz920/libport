@@ -251,17 +251,6 @@ class AttGuardClient {
     }
 
     template<proto::Command::Type type>
-    proto::Command prepare(
-        const typename proto::statement_traits<type>::msg_type &statement) {
-      proto::Command cmd;
-      cmd.set_id(utils::gen_rand_uint64());
-      cmd.set_type(type);
-      auto stmt_field = cmd.mutable_statement();
-      stmt_field->PackFrom(statement);
-      return cmd;
-    }
-
-    template<proto::Command::Type type>
     int status_int(const proto::ResponseWrapper &r) {
       auto status = r.status();
       if (loglevel() == LOG_DEBUG) {
@@ -347,9 +336,7 @@ int libport_init(int run_as_iaas, const char *daemon_path) {
     return val; \
   }
 
-
-
-int _create_principal_new(uint64_t uuid, const char *image, const char *config,
+static int _create_principal_new(uint64_t uuid, const char *image, const char *config,
     const char *ip, uint32_t port_lo, uint32_t port_hi) {
   if (!ip || *ip == '\0') {
     return latte_client->create_principal(uuid, image, config, 
@@ -378,7 +365,7 @@ int create_principal_new(uint64_t uuid, const char *image, const char *config,
   uint32_t port_hi = port_lo + nport;
   /// protobuf does not support null, make sure things are consistent
   if (!image) image = "";
-  if (!config) config = "";
+  if (!config) config = "*";
   return _create_principal_new(uuid, image, config, new_ip, port_lo, port_hi);
 }
 
@@ -386,6 +373,14 @@ int create_principal(uint64_t uuid, const char *image, const char *config,
     int nport) {
   return ::create_principal_new(uuid, image, config, nport, "");
 }
+
+int create_principal_with_allocated_ports(uint64_t uuid, const char *image,
+    const char *config, const char * ip, int port_lo, int port_hi) {
+  if (!image) image = "";
+  if (!config) config = "*";
+  return ::_create_principal_new(uuid, image, config, ip, port_lo, port_hi);
+}
+
 
 /// Legacy API
 int create_image(const char *image_hash, const char *source_url,
@@ -424,7 +419,7 @@ int endorse_image_new(const char *image_hash, const char *config,
 
 /// Should delete this API
 int endorse_image(const char *image_hash, const char *endorsement) {
-  return endorse_image_new(image_hash, "", endorsement);
+  return endorse_image_new(image_hash, "*", endorsement);
 }
 
 /// legacy API
@@ -540,26 +535,24 @@ int revoke_principal(const char *, uint32_t , int , const char *) {
   return -1;
 }
 
-int endorse_image_latte(const char *id, const char *config, int type, const char *property) {
+int endorse_image_latte(const char *id, const char *config, const char *property) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(id);
   CHECK_NULL_PTR(property);
   if (!config) config = "*";
-  latte::log("endorse image: %s:%s, with %d:%s", id, config, type, property);
-  return latte_client->endorse(id, config, type, property);
+  latte::log("endorse image: %s:%s, with %s", id, config, property);
+  return latte_client->endorse(id, config, latte::proto::Endorse::IMAGE, property);
 }
 
-int endorse_source(const char *url, const char *rev,
-    const char *config, int type, const char *property) {
+int endorse_source_latte(const char *url, const char *rev, const char *config, const char *property) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(url);
   CHECK_NULL_PTR(rev);
+  auto id = latte::utils::format_image_source(url, rev);
   CHECK_NULL_PTR(property);
   if (!config) config = "*";
-  std::string id = latte::utils::format_image_source(url, rev);
-  latte::log("endorse source: %s:%s, with %d:%s",
-      id.c_str(), config, type, property);
-  return latte_client->endorse(id, config, type, property);
+  latte::log("endorse source: %s:%s, with %s", id.c_str(), config, property);
+  return latte_client->endorse(id, config, latte::proto::Endorse::SOURCE, property);
 }
 
 int revoke(const char *, const char *, int , const char *) {
@@ -590,7 +583,7 @@ int endorse_builder(const char *id, const char *config) {
   return latte_client->endorse_attester(id, config);
 }
 
-int endorse_source(const char *id, const char *config,
+int endorse_image_source(const char *id, const char * config,
     const char *source_url, const char *source_rev) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(id);

@@ -111,6 +111,9 @@ class ResponseWrapper {
     ResponseWrapper(std::unique_ptr<Response> r):
       r_(std::move(r)) {
       }
+    ResponseWrapper(std::shared_ptr<Response> r):
+      r_(std::move(r)) {
+      }
     ResponseWrapper(Response *r): r_(std::unique_ptr<Response>(r)) {}
     ResponseWrapper(ResponseWrapper &&other){
       r_.swap(other.r_);
@@ -158,7 +161,7 @@ class ResponseWrapper {
     }
 
   private:
-    std::unique_ptr<Response> r_;
+    std::shared_ptr<Response> r_;
 
 
 };

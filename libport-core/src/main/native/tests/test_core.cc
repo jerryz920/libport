@@ -6,8 +6,10 @@
 #include "image.h"
 #include "core_manager.h"
 #include "metadata.h"
-#include "mock.h"
+#include "jutils/mock.h"
 #include "utils.h"
+
+#include "test-include/mock-metadata-client.h"
 
 #include <chrono>
 #include "cpprest/json.h"
@@ -18,46 +20,6 @@
 
 namespace latte {
 
-
-class MockMetadataClient: public MetadataServiceClient {
-  public:
-    MOCK_METHOD6(std::string, post_new_principal,
-        const std::string&, principal_name,
-        const std::string&, principal_ip, int, port_min,
-        int, port_max, const std::string&, image_hash,
-        const std::string&, configs, override)
-
-    MOCK_VOID_METHOD6(remove_principal,
-        const std::string&, principal_name,
-        const std::string&, principal_ip, int, port_min,
-        int, port_max, const std::string&, image_hash,
-        const std::string&, configs, override)
-
-    MOCK_VOID_METHOD4(post_new_image,
-        const std::string&, image_hash,
-        const std::string&, source_url,
-        const std::string&, source_rev,
-        const std::string&, misc_conf, override)
-
-    MOCK_VOID_METHOD2(post_object_acl,
-        const std::string&, obj_id,
-        const std::string&, requirements, override)
-
-    MOCK_VOID_METHOD3(endorse_image,
-        const std::string&, image_hash,
-        const std::string&, endorsement,
-        const std::string&, config, override)
-
-    MOCK_METHOD4(bool, has_property,
-        const std::string&, principal_ip, int, port,
-        const std::string&, property,
-        const std::string&, bearer, override)
-
-    MOCK_METHOD4(bool, can_access,
-        const std::string&, principal_ip, int, port,
-        const std::string&, access_object, 
-        const std::string&, bearer, override)
-};
 
 class MockSyscallProxy :public SyscallProxy {
   public:

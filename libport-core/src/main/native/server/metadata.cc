@@ -104,6 +104,24 @@ namespace {
       }
     };
   }
+
+
+  std::string extract_safe_identity(web::json::value result) {
+    auto wrap = result["message"].as_string();
+    auto start = wrap.find('\'');
+    if (start == std::string::npos) {
+      std::stringstream ss;
+      ss <<"no quote found in message: " << wrap.c_str();
+      throw std::runtime_error(ss.str());
+    }
+    auto end = wrap.rfind('\'');
+    if (end == start) {
+      std::stringstream ss;
+      ss << "ill formed return message, can not find key: " << wrap.c_str();
+      throw std::runtime_error(ss.str());
+    }
+    return wrap.substr(start + 1, end - start - 1);
+  }
 }
 
 
@@ -172,25 +190,7 @@ std::string MetadataServiceClient::post_new_principal(const std::string& princip
     .then(json_task("creating principal"))
     .then([&](pplx::task<web::json::value> v) -> pplx::task<web::http::http_response> {
         try {
-          auto result = v.get();
-          auto wrap = result["message"].as_string();
-          auto start = wrap.find('\'');
-          if (start == std::string::npos) {
-            std::stringstream ss;
-            ss <<"no quote found in message: " << wrap.c_str();
-            auto s = ss.str();
-            log_err(s.c_str());
-            throw std::runtime_error(std::move(s));
-          }
-          auto end = wrap.rfind('\'');
-          if (end == start) {
-            std::stringstream ss;
-            ss << "ill formed return message, can not find key: " << wrap.c_str();
-            auto s = ss.str();
-            log_err(s.c_str());
-            throw std::runtime_error(std::move(s));
-          }
-          auto key = wrap.substr(start + 1, end - start - 1);
+          auto key = extract_safe_identity(v.get());
           identity = key;
           return this->post_statement("/updateSubjectSet", utils::format_netaddr(principal_ip, port_min,
                 port_max), {key});
@@ -247,11 +247,22 @@ void MetadataServiceClient::endorse_image(const std::string& image_hash,
 }
 
 void MetadataServiceClient::endorse_membership(const std::string &ip,
-    uint32_t port, const std::string &property) {
-  this->post_statement("/postWorkerSet", myid(), {
-      utils::format_netaddr(ip, port), property})
+    uint32_t port, const std::string &property, const std::string &config) {
+  std::string identity;
+  this->post_statement("/postWorkerSet", myid(), {property,
+      utils::format_netaddr(ip, port), config})
     .then(debug_task())
-    .then(sink_task("endorsing membership")).wait();
+    .then(json_task("endorsing membership"))
+    .then([&](pplx::task<web::json::value> v) -> pplx::task<web::http::http_response> {
+        try {
+          auto key = extract_safe_identity(v.get());
+          identity = key;
+          return this->post_statement("/updateWorkerSet", utils::format_netaddr(ip, port), {key});
+        } catch(std::runtime_error &e) {
+          return pplx::task_from_exception<web::http::http_response>(
+            std::runtime_error(std::move(e)));
+        }})
+    .then(sink_task("updating membership")).wait();
 }
 
 void MetadataServiceClient::endorse_builder_on_source(const std::string &source_id,
@@ -294,7 +305,7 @@ void MetadataServiceClient::endorse_source(const std::string &image_id,
 }
 
 bool MetadataServiceClient::has_property(const std::string& principal_ip,
-    int port, const std::string& property, const std::string& bearer) {
+    uint32_t port, const std::string& property, const std::string& bearer) {
   return this->post_statement("/attestAppProperty", ATTEST_IDENTITY, {
       utils::format_netaddr(principal_ip, port), property}, bearer)
     .then(debug_task())
@@ -314,7 +325,7 @@ bool MetadataServiceClient::has_property(const std::string& principal_ip,
     }).get();
 }
 
-bool MetadataServiceClient::can_access(const std::string& principal_ip, int port,
+bool MetadataServiceClient::can_access(const std::string& principal_ip, uint32_t port,
     const std::string& access_object, const std::string& bearer) {
   return this->post_statement("/appAccessesObject", ATTEST_IDENTITY, {
       utils::format_netaddr(principal_ip, port), access_object}, bearer)
@@ -334,6 +345,29 @@ bool MetadataServiceClient::can_access(const std::string& principal_ip, int port
       }
     }).get();
 }
+
+bool MetadataServiceClient::can_worker_access(const std::string& principal_ip, uint32_t port,
+    const std::string& access_object, const std::string& bearer) {
+  return this->post_statement("/workerAccessesObject", ATTEST_IDENTITY, {
+      utils::format_netaddr(principal_ip, port), access_object}, bearer)
+    .then(debug_task())
+    .then(json_task("attest worker access"))
+    .then([](pplx::task<web::json::value> v) -> bool {
+      try {
+        auto msg = v.get()["message"].as_string();
+        if (msg.find("approveAccess") == std::string::npos) {
+          log("not approving access: %s", msg.c_str());
+          return false;
+        }
+        return true;
+      } catch (std::runtime_error &e) {
+        /// we alreay caught it, no need to do again
+        return false;
+      }
+    }).get();
+}
+
+
 
 std::string MetadataServiceClient::attest(const std::string &ip,
     uint32_t port, const std::string &bearer) {

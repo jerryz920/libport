@@ -93,7 +93,7 @@ class MetadataServiceClient {
         const std::string &config);
 
     virtual void endorse_membership(const std::string &ip, uint32_t port,
-        const std::string &endorse);
+        const std::string &endorse, const std::string &config);
 
     virtual void endorse_attester_on_source(const std::string &source_id,
         const std::string &config);
@@ -108,12 +108,14 @@ class MetadataServiceClient {
     //    const std::string& source_revision, const std::string& endorsement);
 
     // bearer should use the value returned by "post_new_principal"
-    virtual bool has_property(const std::string& principal_ip, int port,
+    virtual bool has_property(const std::string& principal_ip, uint32_t port,
         const std::string& property, const std::string& bearer_ref);
-    virtual bool can_access(const std::string& principal_ip, int port,
+    virtual bool can_access(const std::string& principal_ip, uint32_t port,
         const std::string& access_object, const std::string& bearer_ref);
     virtual std::string attest(const std::string &principal_ip, uint32_t port,
         const std::string &bearer);
+    virtual bool can_worker_access(const std::string &ip, uint32_t port,
+        const std::string &object, const std::string &bearer);
 
     const std::string& myid() const { return myid_; }
 

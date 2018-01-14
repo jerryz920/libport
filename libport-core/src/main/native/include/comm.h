@@ -37,6 +37,7 @@
 #include "google/protobuf/message.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "utils.h"
+#include "proto/traits.h"
 
 namespace latte {
 
@@ -82,6 +83,17 @@ namespace latte {
       }
       return 0;
     }
+
+template<proto::Command::Type type>
+proto::Command prepare(
+    const typename proto::statement_traits<type>::msg_type &statement) {
+  proto::Command cmd;
+  cmd.set_id(utils::gen_rand_uint64());
+  cmd.set_type(type);
+  auto stmt_field = cmd.mutable_statement();
+  stmt_field->PackFrom(statement);
+  return cmd;
+}
 
 
 
