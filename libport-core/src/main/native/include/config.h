@@ -6,7 +6,7 @@
 namespace latte {
 /// to pass configure we now have a plain string, but we will leave
 //space for the map.
-const char *LEGACY_CONFIG_KEY = "LEGACY_CONFIG_STRING";
+constexpr const char *LEGACY_CONFIG_KEY = "LEGACY_CONFIG_STRING";
 
 /// For object smaller than such size we will use pre-allocated buffer
 // for larger one we dynamic allocate
@@ -24,6 +24,8 @@ constexpr const char *METADATA_SERVICE_URL = "metadata_url";
 constexpr const char *METADATA_SERVICE_IP = "metadata_ip";
 constexpr const char *METADATA_SERVICE_PORT = "metadata_port";
 constexpr const uint32_t METADATA_SERVICE_DEFAULT_PORT = 7777;
+constexpr const char *DAEMON_SOCKET_PATH = "daemon_socket";
+constexpr const char *DAEMON_SOCKET_DEFAULT_PATH = "/var/run/latte/guard.sock";
 
 
 
@@ -32,6 +34,7 @@ struct ConfigItems {
   std::string myip;
   std::string metadata_url;
   std::string metadata_ip;
+  std::string local_ep;
   uint32_t metadata_port;
   bool run_as_iaas;
 } ;
@@ -60,6 +63,10 @@ static inline uint32_t metadata_service_port() {
 
 static inline bool run_as_iaas() {
   return config_cache_.run_as_iaas;
+}
+
+static inline const std::string &local_daemon_path() {
+  return config_cache_.local_ep;
 }
 
 

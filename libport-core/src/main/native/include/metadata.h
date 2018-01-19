@@ -94,6 +94,8 @@ class MetadataServiceClient {
 
     virtual void endorse_membership(const std::string &ip, uint32_t port,
         const std::string &endorse, const std::string &config);
+    virtual void endorse_membership(const std::string &ip, uint32_t port,
+        uint64_t gn, const std::string &endorse, const std::string &config);
 
     virtual void endorse_attester_on_source(const std::string &source_id,
         const std::string &config);

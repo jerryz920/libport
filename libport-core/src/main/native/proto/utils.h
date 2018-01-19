@@ -54,7 +54,7 @@ static inline Response* make_status_response(bool success,
 
 static inline std::shared_ptr<Response> make_shared_status_response(
     bool success, const std::string &msg) {
-  return std::make_shared<Response>(make_status_response(success, msg));
+  return std::shared_ptr<Response>(make_status_response(success, msg));
 }
 
 static inline Response* make_principal_response(const Principal &p) {
@@ -67,7 +67,7 @@ static inline Response* make_principal_response(const Principal &p) {
 
 static inline std::shared_ptr<Response> make_shared_principal_response(
     const Principal &p) {
-  return std::make_shared<Response>(make_principal_response(p));
+  return std::shared_ptr<Response>(make_principal_response(p));
 }
 
 static inline Response* make_metadata_config_response(const MetadataConfig &m) {
@@ -80,7 +80,7 @@ static inline Response* make_metadata_config_response(const MetadataConfig &m) {
 
 static inline std::shared_ptr<Response> make_shared_metadata_config_response(
     const MetadataConfig &m) {
-  return std::make_shared<Response>(make_metadata_config_response(m));
+  return std::shared_ptr<Response>(make_metadata_config_response(m));
 }
 
 static inline Response* make_attestation_response(const Attestation &a) {
@@ -93,11 +93,11 @@ static inline Response* make_attestation_response(const Attestation &a) {
 
 static inline std::shared_ptr<Response> make_shared_attestation_response(
     const Attestation &a) {
-  return std::make_shared<Response>(make_attestation_response(a));
+  return std::shared_ptr<Response>(make_attestation_response(a));
 }
 
 static inline std::shared_ptr<Response> not_implemented() {
-  return std::make_shared<Response>(false, "Not Implemented");
+  return make_shared_status_response(false, "Not Implemented");
 }
 
 

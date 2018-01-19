@@ -23,6 +23,14 @@ void load_config(const std::string &path) {
   if (!run_as_iaas) {
     throw std::runtime_error("run as iaas not configured!\n");
   }
+  const std::string *local_ep = conf.get(latte::config::DAEMON_SOCKET_PATH);
+  if (!local_ep) {
+    /// using default local ep
+    config_cache_.local_ep = DAEMON_SOCKET_DEFAULT_PATH;
+  } else {
+    config_cache_.local_ep = *local_ep;
+  }
+
   const std::string *metadata_ip = conf.get(latte::config::METADATA_SERVICE_IP);
   const std::string *port_str = conf.get(latte::config::METADATA_SERVICE_PORT);
 

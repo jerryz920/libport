@@ -246,11 +246,31 @@ void MetadataServiceClient::endorse_image(const std::string& image_hash,
     .then(sink_task("endorsing image")).wait();
 }
 
+//// TODO: should merge these two methods.
 void MetadataServiceClient::endorse_membership(const std::string &ip,
     uint32_t port, const std::string &property, const std::string &config) {
   std::string identity;
   this->post_statement("/postWorkerSet", myid(), {property,
       utils::format_netaddr(ip, port), config})
+    .then(debug_task())
+    .then(json_task("endorsing membership"))
+    .then([&](pplx::task<web::json::value> v) -> pplx::task<web::http::http_response> {
+        try {
+          auto key = extract_safe_identity(v.get());
+          identity = key;
+          return this->post_statement("/updateWorkerSet", utils::format_netaddr(ip, port), {key});
+        } catch(std::runtime_error &e) {
+          return pplx::task_from_exception<web::http::http_response>(
+            std::runtime_error(std::move(e)));
+        }})
+    .then(sink_task("updating membership")).wait();
+}
+
+void MetadataServiceClient::endorse_membership(const std::string &ip,
+    uint32_t port, uint64_t gn, const std::string &property, const std::string &config) {
+  std::string identity;
+  this->post_statement("/postWorkerSet", myid(), {property,
+      utils::format_netaddr(ip, port), utils::itoa(gn), config})
     .then(debug_task())
     .then(json_task("endorsing membership"))
     .then([&](pplx::task<web::json::value> v) -> pplx::task<web::http::http_response> {

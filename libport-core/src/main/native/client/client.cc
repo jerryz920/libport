@@ -76,10 +76,9 @@ class AttGuardClient {
       return quick_post<proto::Command::CREATE_PRINCIPAL>(p);
     }
 
-    int delete_principal(uint64_t uuid, uint64_t gn) {
+    int delete_principal(uint64_t uuid) {
       proto::Principal p;
       p.set_id(uuid);
-      p.set_gn(gn);
       return quick_post<proto::Command::DELETE_PRINCIPAL>(p);
     }
 
@@ -91,10 +90,9 @@ class AttGuardClient {
       return quick_get_principal<proto::Command::GET_PRINCIPAL>(lookup);
     }
 
-    std::unique_ptr<proto::Principal> get_local_principal(uint64_t uuid, uint64_t gn) {
+    std::unique_ptr<proto::Principal> get_local_principal(uint64_t uuid) {
       proto::Principal lookup;
       lookup.set_id(uuid);
-      lookup.set_gn(gn);
       return quick_get_principal<proto::Command::GET_PRINCIPAL>(lookup);
     }
 
@@ -104,10 +102,11 @@ class AttGuardClient {
       return resp.extract_metadata_config();
     }
 
-    int endorse_principal(const std::string &ip, uint32_t port, int type,
+    int endorse_principal(const std::string &ip, uint32_t port, uint64_t gn, int type,
         const std::string &property) {
       proto::EndorsePrincipal statement;
       auto p = statement.mutable_principal();
+      p->set_gn(gn);
       auto auth = p->mutable_auth();
       auth->set_ip(ip);
       auth->set_port_lo(port);
@@ -126,16 +125,28 @@ class AttGuardClient {
       return -1;
     }
 
-    int endorse(const std::string &id, const std::string &config,
-        int type, const std::string &property) {
+    int _endorse(const std::string &id, const std::string &config,
+        proto::Endorse::Type stmt_type, int endorse_type, const std::string &property) {
       proto::Endorse statement;
       statement.set_id(id);
+      statement.set_type(stmt_type);
       auto endorsement = statement.add_endorsements();
-      set_type(endorsement, type);
+      set_type(endorsement, endorse_type);
       endorsement->set_property(property);
       auto& confmap = *statement.mutable_config();
       confmap[LEGACY_CONFIG_KEY] = config;
       return quick_post<proto::Command::ENDORSE>(statement);
+    }
+
+
+    int endorse_image(const std::string &id, const std::string &config,
+        int type, const std::string &property) {
+      return _endorse(id, config, proto::Endorse::IMAGE, type, property);
+    }
+
+    int endorse_source(const std::string &id, const std::string &config,
+        int type, const std::string &property) {
+      return _endorse(id, config, proto::Endorse::SOURCE, type, property);
     }
 
     int revoke(const std::string &, const std::string &, 
@@ -144,10 +155,11 @@ class AttGuardClient {
       return -1;
     }
 
-    int endorse_membership(const std::string &ip, uint32_t port,
+    int endorse_membership(const std::string &ip, uint32_t port, uint64_t gn,
         const std::string &property) {
       proto::EndorsePrincipal statement;
       auto p = statement.mutable_principal();
+      p->set_gn(gn);
       auto auth = p->mutable_auth();
       auth->set_ip(ip);
       auth->set_port_lo(port);
@@ -289,13 +301,12 @@ class AttGuardClient {
 
 static std::unique_ptr<latte::AttGuardClient> latte_client; 
 static std::unique_ptr<SyscallProxy> syscall_gate;
-
-
+static std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> port_usage;
 
 
 // This must be called if a process intends to become an attester. It will
 // clear stalled information (if any)
-int libport_init(int run_as_iaas, const char *daemon_path) {
+int liblatte_init(int run_as_iaas, const char *daemon_path) {
   std::string myip;
   if (run_as_iaas) {
     myip = IAAS_IDENTITY;
@@ -303,13 +314,13 @@ int libport_init(int run_as_iaas, const char *daemon_path) {
     myip = latte::utils::get_myip();
   }
   if (myip.compare("") == 0) {
-    latte::log_err("failed to initialize libport principal identity");
+    latte::log_err("failed to initialize liblatte principal identity");
     return -1;
   }
   latte_client = latte::utils::make_unique<latte::AttGuardClient>(myip, daemon_path);
   syscall_gate = latte::utils::make_unique<SyscallProxyImpl>();
 
-  latte::log("libport core initialized for process %d\n", getpid());
+  latte::log("liblatte core initialized for process %d\n", getpid());
   return 0;
 }
 
@@ -347,7 +358,7 @@ static int _create_principal_new(uint64_t uuid, const char *image, const char *c
   }
 }
 
-int create_principal_new(uint64_t uuid, const char *image, const char *config,
+int liblatte_create_principal_new(uint64_t uuid, const char *image, const char *config,
     int nport, const char *new_ip) {
   // create principal, addresses are assgined by the library. Any statement
   // appended will be included must be "const char*" type, which means String
@@ -366,15 +377,19 @@ int create_principal_new(uint64_t uuid, const char *image, const char *config,
   /// protobuf does not support null, make sure things are consistent
   if (!image) image = "";
   if (!config) config = "*";
-  return _create_principal_new(uuid, image, config, new_ip, port_lo, port_hi);
+  if (!_create_principal_new(uuid, image, config, new_ip, port_lo, port_hi)) {
+    port_usage[uuid] = std::make_pair(port_lo, port_hi);
+    return 0;
+  }
+  return 1;
 }
 
-int create_principal(uint64_t uuid, const char *image, const char *config,
+int liblatte_create_principal(uint64_t uuid, const char *image, const char *config,
     int nport) {
-  return ::create_principal_new(uuid, image, config, nport, "");
+  return ::liblatte_create_principal_new(uuid, image, config, nport, "");
 }
 
-int create_principal_with_allocated_ports(uint64_t uuid, const char *image,
+int liblatte_create_principal_with_allocated_ports(uint64_t uuid, const char *image,
     const char *config, const char * ip, int port_lo, int port_hi) {
   if (!image) image = "";
   if (!config) config = "*";
@@ -383,7 +398,7 @@ int create_principal_with_allocated_ports(uint64_t uuid, const char *image,
 
 
 /// Legacy API
-int create_image(const char *image_hash, const char *source_url,
+int liblatte_create_image(const char *image_hash, const char *source_url,
     const char *source_rev, const char *misc_conf) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(image_hash);
@@ -398,7 +413,7 @@ int create_image(const char *image_hash, const char *source_url,
       latte::utils::format_image_source(source_url, source_rev));
 }
 
-int post_object_acl(const char *obj_id, const char *requirement) {
+int liblatte_post_object_acl(const char *obj_id, const char *requirement) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(obj_id);
   CHECK_NULL_PTR(requirement);
@@ -406,24 +421,9 @@ int post_object_acl(const char *obj_id, const char *requirement) {
   return latte_client->post_acl(obj_id, requirement);
 }
 
-int endorse_image_new(const char *image_hash, const char *config,
-    const char *endorsement) {
-  CHECK_LIB_INIT;
-  CHECK_NULL_PTR(image_hash);
-  CHECK_NULL_PTR(config);
-  CHECK_NULL_PTR(endorsement);
-  latte::log("endorsing image: %s, %s, %s\n", image_hash, endorsement, config);
-  return latte_client->endorse(image_hash, config, 
-      latte::proto::Endorsement::OTHER, endorsement);
-}
-
-/// Should delete this API
-int endorse_image(const char *image_hash, const char *endorsement) {
-  return endorse_image_new(image_hash, "*", endorsement);
-}
 
 /// legacy API
-int attest_principal_property(const char *ip, uint32_t port, const char *prop) {
+int liblatte_attest_principal_property(const char *ip, uint32_t port, const char *prop) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(ip);
   CHECK_NULL_PTR(prop);
@@ -431,7 +431,7 @@ int attest_principal_property(const char *ip, uint32_t port, const char *prop) {
   return latte_client->check_property(ip, port, prop);
 }
 
-int attest_principal_access(const char *ip, uint32_t port, const char *obj) {
+int liblatte_attest_principal_access(const char *ip, uint32_t port, const char *obj) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(ip);
   CHECK_NULL_PTR(obj);
@@ -439,19 +439,23 @@ int attest_principal_access(const char *ip, uint32_t port, const char *obj) {
   return latte_client->check_access(ip, port, obj);
 }
 
-int delete_principal(uint64_t uuid, uint64_t gn) {
-  CHECK_LIB_INIT;
-  latte::log("deleting principal: %llu %llu\n", uuid, gn);
-  return latte_client->delete_principal(uuid, gn);
+int liblatte_delete_principal_without_allocated_ports(uint64_t uuid) {
+  latte::log("deleting principal: %llu\n", uuid);
+  return latte_client->delete_principal(uuid);
 }
 
-void libport_set_log_level(int upto) {
+
+int liblatte_delete_principal(uint64_t uuid) {
+  return liblatte_delete_principal_without_allocated_ports(uuid);
+}
+
+void liblatte_set_log_level(int upto) {
   latte::setloglevel(upto);
 }
 
 /// helper
 
-char* get_principal(const char *ip, uint32_t lo, char **principal,
+char* liblatte_get_principal(const char *ip, uint32_t lo, char **principal,
     size_t *size) {
   CHECK_LIB_INIT_PTR;
   CHECK_NULL_PTR1(ip, nullptr);
@@ -472,7 +476,7 @@ char* get_principal(const char *ip, uint32_t lo, char **principal,
 
 }
 
-char* get_local_principal(uint64_t uuid, uint64_t gn, char **principal,
+char* liblatte_get_local_principal(uint64_t uuid, char **principal,
     size_t *size) {
   CHECK_LIB_INIT_PTR;
   CHECK_NULL_PTR1(principal, nullptr);
@@ -481,9 +485,9 @@ char* get_local_principal(uint64_t uuid, uint64_t gn, char **principal,
     latte::log("warning: config buffer not empty, possible memory leaking");
   }
 
-  latte::log("get local principal: %u:%u\n", uuid, gn);
+  latte::log("get local principal: %u\n", uuid);
   std::unique_ptr<latte::proto::Principal> p = 
-    latte_client->get_local_principal(uuid, gn);
+    latte_client->get_local_principal(uuid);
   if (p) {
     return wrap_proto_msg(*p, principal, size);
   } else {
@@ -491,7 +495,7 @@ char* get_local_principal(uint64_t uuid, uint64_t gn, char **principal,
   }
 }
 
-int get_metadata_config_easy(char *url, size_t *url_sz) {
+int liblatte_get_metadata_config_easy(char *url, size_t *url_sz) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(url);
   CHECK_NULL_PTR(url_sz);
@@ -507,7 +511,7 @@ int get_metadata_config_easy(char *url, size_t *url_sz) {
   return 1;
 }
 
-char* get_metadata_config(char **metadata_config, size_t *size) {
+char* liblatte_get_metadata_config(char **metadata_config, size_t *size) {
   CHECK_LIB_INIT_PTR;
   CHECK_NULL_PTR1(metadata_config, nullptr);
   CHECK_NULL_PTR1(size, nullptr);
@@ -521,30 +525,31 @@ char* get_metadata_config(char **metadata_config, size_t *size) {
   return wrap_proto_msg(*config, metadata_config, size);
 }
 
-int endorse_principal(const char *ip, uint32_t port, int type,
+int liblatte_endorse_principal(const char *ip, uint32_t port, uint64_t gn, int type,
     const char *property) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(ip);
   CHECK_NULL_PTR(property);
-  latte::log("endorse principal: %s:%u, with %d:%s", ip, port, type, property);
-  return latte_client->endorse_principal(ip, port, type, property);
+  latte::log("endorse principal: %s:%u:%llu, with %d:%s", ip, port, gn, type, property);
+  return latte_client->endorse_principal(ip, port, gn, type, property);
 }
 
-int revoke_principal(const char *, uint32_t , int , const char *) {
+int liblatte_revoke_principal(const char *, uint32_t , int , const char *) {
   latte::log_err("Not Implemented: revoke_principal");
   return -1;
 }
 
-int endorse_image_latte(const char *id, const char *config, const char *property) {
+int liblatte_endorse_image(const char *id, const char *config, const char *property) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(id);
   CHECK_NULL_PTR(property);
   if (!config) config = "*";
   latte::log("endorse image: %s:%s, with %s", id, config, property);
-  return latte_client->endorse(id, config, latte::proto::Endorse::IMAGE, property);
+  return latte_client->endorse_image(id, config, latte::proto::Endorse::IMAGE, property);
 }
 
-int endorse_source_latte(const char *url, const char *rev, const char *config, const char *property) {
+int liblatte_endorse_source(const char *url, const char *rev, const char *config,
+    const char *property) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(url);
   CHECK_NULL_PTR(rev);
@@ -552,22 +557,22 @@ int endorse_source_latte(const char *url, const char *rev, const char *config, c
   CHECK_NULL_PTR(property);
   if (!config) config = "*";
   latte::log("endorse source: %s:%s, with %s", id.c_str(), config, property);
-  return latte_client->endorse(id, config, latte::proto::Endorse::SOURCE, property);
+  return latte_client->endorse_source(id, config, latte::proto::Endorse::SOURCE, property);
 }
 
-int revoke(const char *, const char *, int , const char *) {
+int liblatte_revoke(const char *, const char *, int , const char *) {
   latte::log_err("Not Implemented: revoke");
   return -1;
 }
 
-int endorse_membership(const char *ip, uint32_t port, const char *master) {
+int liblatte_endorse_membership(const char *ip, uint32_t port, uint64_t gn, const char *master) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(master);
-  latte::log("endorse membership: %s:%u, with %s", ip, port, master);
-  return latte_client->endorse_membership(ip, port, master);
+  latte::log("endorse membership: %s:%u:%u, with %s", ip, port, gn, master);
+  return latte_client->endorse_membership(ip, port, gn, master);
 }
 
-int endorse_attester(const char *id, const char *config) {
+int liblatte_endorse_attester(const char *id, const char *config) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(id);
   if (!config) config = "*";
@@ -575,7 +580,7 @@ int endorse_attester(const char *id, const char *config) {
   return latte_client->endorse_attester(id, config);
 }
 
-int endorse_builder(const char *id, const char *config) {
+int liblatte_endorse_builder(const char *id, const char *config) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(id);
   if (!config) config = "*";
@@ -583,7 +588,7 @@ int endorse_builder(const char *id, const char *config) {
   return latte_client->endorse_attester(id, config);
 }
 
-int endorse_image_source(const char *id, const char * config,
+int liblatte_endorse_image_source(const char *id, const char * config,
     const char *source_url, const char *source_rev) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(id);
@@ -596,7 +601,7 @@ int endorse_image_source(const char *id, const char * config,
       latte::utils::format_image_source(source_url, source_rev));
 }
 
-int check_property(const char *ip, uint32_t port, const char *property) {
+int liblatte_check_property(const char *ip, uint32_t port, const char *property) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(ip);
   CHECK_NULL_PTR(property);
@@ -604,7 +609,7 @@ int check_property(const char *ip, uint32_t port, const char *property) {
   return latte_client->check_property(ip, port, property);
 }
 
-int check_access(const char *ip, uint32_t port, const char *object) {
+int liblatte_check_access(const char *ip, uint32_t port, const char *object) {
   CHECK_LIB_INIT;
   CHECK_NULL_PTR(ip);
   CHECK_NULL_PTR(object);
@@ -612,7 +617,7 @@ int check_access(const char *ip, uint32_t port, const char *object) {
   return latte_client->check_access(ip, port, object);
 }
 
-char* check_attestation(const char *ip, uint32_t port, char **attestation,
+char* liblatte_check_attestation(const char *ip, uint32_t port, char **attestation,
     size_t *size) {
   CHECK_LIB_INIT_PTR;
   CHECK_NULL_PTR1(ip, nullptr);

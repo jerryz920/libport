@@ -33,13 +33,13 @@ class LatteAttestationManager: public LatteDispatcher {
             metadata_server, latte::config::myid())) {
           init();
     }
-    LatteAttestationManager(std::unique_ptr<MetadataServiceClient> service):
-      LatteAttestationManager(std::move(service),crossplat::threadpool::shared_instance()) {
+    LatteAttestationManager(MetadataServiceClient* service):
+      LatteAttestationManager(service,crossplat::threadpool::shared_instance()) {
     }
 
-    LatteAttestationManager(std::unique_ptr<MetadataServiceClient> service,
+    LatteAttestationManager(MetadataServiceClient* service,
         crossplat::threadpool &pool): executor_(pool),
-        metadata_service_(std::move(service)) {
+        metadata_service_(service) {
           init();
     }
 
@@ -52,24 +52,20 @@ class LatteAttestationManager: public LatteDispatcher {
         } catch (const std::runtime_error &e) {
           std::string errmsg = "runtime error " + std::string(e.what());
           log_err(errmsg.c_str());
-          result = std::make_shared<proto::Response>(
-              proto::make_status_response(false, errmsg));
+          result = proto::make_shared_status_response(false, errmsg);
         } catch (const web::json::json_exception &e) {
           std::string errmsg = "json error " + std::string(e.what());
           log_err(errmsg.c_str());
-          result = std::make_shared<proto::Response>(
-              proto::make_status_response(false, errmsg));
+          result = proto::make_shared_status_response(false, errmsg);
         } catch(const web::http::http_exception &e) {
           std::string errmsg = "http error " + std::string(e.what());
           log_err(errmsg.c_str());
-          result = std::make_shared<proto::Response>(
-              proto::make_status_response(false, errmsg));
+          result = proto::make_shared_status_response(false, errmsg);
         }
       } else {
         std::string typedesc = proto::Command::Type_Name(cmd->type());
-        result = std::make_shared<proto::Response>(
-            proto::make_status_response(false,
-              "not handler found for type " + typedesc));
+        result = proto::make_shared_status_response(false,
+              "not handler found for type " + typedesc);
       }
       w(result);
       return true;
@@ -153,6 +149,7 @@ class LatteAttestationManager: public LatteDispatcher {
       auto res = metadata_service_->post_new_principal(principal_name(*p),
           p->auth().ip(), p->auth().port_lo(), p->auth().port_hi(),
           p->code().image(), p->code().config().at(LEGACY_CONFIG_KEY));
+      p->set_speaker(cmd->pid());
       add_principal(p->id(), p);
       return proto::make_shared_status_response(true, "");
     }
@@ -168,24 +165,25 @@ class LatteAttestationManager: public LatteDispatcher {
       std::shared_ptr<proto::Principal> latest = nullptr;
       plock_.lock();
       auto matched = principals_.equal_range(p->id());
-      for (auto i = matched.first; i != matched.second;) {
+      for (auto i = matched.first; i != matched.second; ++i) {
         if (maxgn <= i->second->gn()) {
           maxgn = i->second->gn();
           latest = i->second;
         }
-        if (i->second->gn() <= p->gn()) {
-          ///garbage collect... There should only be one process with largest gn
-          i = principals_.erase(i);
-        } else {
-          ++i;
+      }
+      if (latest) {
+        auto speaker = latest->speaker();
+        if ((speaker != cmd->pid() && cmd->uid() != 0)) {
+          plock_.unlock();
+          return proto::make_shared_status_response(false,
+              "privilege not matching");
         }
       }
+      principals_.erase(matched.first, matched.second);
       //// authenticate if deletion is allowed!
 
       /// deleting latest principal
       if (latest) {
-        log("deleting principal: id = %u, maxgn = %u, pgn %u latest = %p, speaker = %u, pid = %u, uid = %u",
-            p->id(), maxgn, p->gn(), latest.get(), cmd->pid(), cmd->uid());
         auto speaker = latest->speaker();
         auto name = principal_name(*latest);
         auto ip = latest->auth().ip();
@@ -193,13 +191,11 @@ class LatteAttestationManager: public LatteDispatcher {
         auto phi = latest->auth().port_hi();
         auto image = latest->code().image();
         auto config = latest->code().config().at(LEGACY_CONFIG_KEY);
+        log("deleting principal: id = %u, maxgn = %u, latest = %p, speaker = %u, pid = %u, uid = %u",
+            p->id(), maxgn, latest.get(), speaker, cmd->pid(), cmd->uid());
 
         plock_.unlock();
-        if (maxgn == p->gn() && 
-            (speaker == cmd->pid() || cmd->uid() == 0)) {
-          metadata_service_->remove_principal(name, ip, plo, phi, image,
-              config);
-        }
+        metadata_service_->remove_principal(name, ip, plo, phi, image, config);
         return proto::make_shared_status_response(true, "");
       } else {
         plock_.unlock();
@@ -256,19 +252,13 @@ class LatteAttestationManager: public LatteDispatcher {
       std::shared_ptr<proto::Principal> latest = nullptr;
       std::lock_guard<std::mutex> guard(plock_);
       auto matched = principals_.equal_range(p->id());
-      for (auto i = matched.first; i != matched.second;) {
+      for (auto i = matched.first; i != matched.second; ++i) {
         if (maxgn <= i->second->gn()) {
           maxgn = i->second->gn();
           latest = i->second;
         }
-        if (i->second->gn() <= p->gn()) {
-          ///garbage collect... There should only be one process with largest gn
-          i = principals_.erase(i);
-        } else {
-          ++i;
-        }
       }
-      if (maxgn == p->gn() && latest) {
+      if (latest) {
         return proto::make_shared_principal_response(*latest);
       } else {
         return proto::make_shared_status_response(false, "not found");
@@ -298,11 +288,12 @@ class LatteAttestationManager: public LatteDispatcher {
       if (endorse_p->endorsements_size() == 0) {
         return proto::make_shared_status_response(false, "must provide one endorsement");
       }
+      auto gn = endorse_p->principal().gn();
       auto &target_ip = endorse_p->principal().auth().ip();
       auto target_port = endorse_p->principal().auth().port_lo();
       auto &target_config = endorse_p->principal().code().config().at(LEGACY_CONFIG_KEY);
       auto &statement = endorse_p->endorsements(0);
-      metadata_service_->endorse_membership(target_ip, target_port, statement.property(),
+      metadata_service_->endorse_membership(target_ip, target_port, gn, statement.property(),
           target_config);
       return proto::make_shared_status_response(true, "");
     }

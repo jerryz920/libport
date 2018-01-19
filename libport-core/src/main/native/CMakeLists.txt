@@ -13,6 +13,7 @@ find_package(Boost 1.54 REQUIRED COMPONENTS unit_test_framework system)
 find_library(CPPREST cpprest)
 find_library(SSL ssl)
 find_library(CRYPTO crypto)
+find_library(JUTILS jutils)
 find_package(Threads)
 
 include(FindProtobuf)
@@ -34,7 +35,7 @@ add_subdirectory(proto)
 add_subdirectory(common)
 add_subdirectory(client)
 add_subdirectory(server)
-#add_subdirectory(tests)
+add_subdirectory(tests)
 
 
 
@@ -43,7 +44,6 @@ add_subdirectory(server)
 #target_link_libraries(port ${port_library_dependencies})
 
 
-#add_executable(test_port_manager test_port_manager.cc proto)
 #target_include_directories(test_port_manager PRIVATE ${Boost_INCLUDE_DIRS} test-include)
 ## indicates the shared library variant
 #target_compile_definitions(test_port_manager PRIVATE "BOOST_TEST_DYN_LINK=1")
