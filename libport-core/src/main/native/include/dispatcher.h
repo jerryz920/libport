@@ -2,7 +2,7 @@
 #ifndef _LIBPORT_DISPATCHER_H
 #define _LIBPORT_DISPATCHER_H
 
-#include "../proto/statement.pb.h"
+#include "proto/statement.pb.h"
 #include <unordered_map>
 
 namespace latte {
