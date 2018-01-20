@@ -397,12 +397,7 @@ std::string MetadataServiceClient::attest(const std::string &ip,
     .then(json_task("attest instance"))
     .then([](pplx::task<web::json::value> v) -> std::string {
       try {
-        auto msg = v.get()["message"].as_string();
-        if (msg.find("approveAccess") == std::string::npos) {
-          log("not approving access: %s", msg.c_str());
-          return "";
-        }
-        return msg;
+        return v.get()["message"].as_string();
       } catch (std::runtime_error &e) {
         /// we alreay caught it, no need to do again
         return "";
