@@ -14,5 +14,14 @@ foreach(fullname ${testfiles})
     COMMAND ${testname})
 endforeach(fullname)
 
+# individual tests
 
+file(GLOB testfiles RELATIVE ${PROJECT_SOURCE_DIR}/tests test_*.cc)
+foreach(fullname ${testfiles})
+  STRING(REGEX REPLACE "[^/]*/" "" testfile "${fullname}")
+  string(REGEX MATCH "^(.*)\\.cc$" dummy ${testfile})
+  set(testname ${CMAKE_MATCH_1})
+  add_executable(${testname} ${fullname}  $<TARGET_OBJECTS:server> $<TARGET_OBJECTS:common>)
+  target_link_libraries(${testname} ${test_library_dependencies})
+endforeach(fullname)
 
