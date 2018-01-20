@@ -35,7 +35,7 @@
 #define _LIBPORT_PROTO_UTILS_H
 
 
-#include "statement.pb.h"
+#include "proto/statement.pb.h"
 
 namespace latte {
 namespace proto{

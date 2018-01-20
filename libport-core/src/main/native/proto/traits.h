@@ -2,7 +2,7 @@
 #ifndef _LIBPORT_PROTO_TRAITS_H
 #define _LIBPORT_PROTO_TRAITS_H
 
-#include "statement.pb.h"
+#include "proto/statement.pb.h"
 
 //// bunch of traits to simplify the programming with templates
 namespace latte {
