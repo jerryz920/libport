@@ -118,6 +118,7 @@ message Command {
 	  CHECK_ATTESTATION = 101;
 	  CHECK_ACCESS = 102;
 	  POST_ACL = 103;
+	  CHECK_WORKER_ACCESS = 104;
 	}
 
 	Type type = 2;

@@ -152,7 +152,7 @@ class ResponseWrapper {
       return std::unique_ptr<MetadataConfig>(m);
     }
 
-    inline std::unique_ptr<Attestation> extract_attetation() const {
+    inline std::unique_ptr<Attestation> extract_attestation() const {
       Attestation *a = Attestation::default_instance().New();
       if (!r_->result().UnpackTo(a)) {
         return nullptr;

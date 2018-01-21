@@ -129,6 +129,8 @@ class LatteAttestationManager: public LatteDispatcher {
           &LatteAttestationManager::check_attestation);
       register_handler(proto::Command::CHECK_ACCESS, 
           &LatteAttestationManager::check_access);
+      register_handler(proto::Command::CHECK_WORKER_ACCESS, 
+          &LatteAttestationManager::check_worker_access);
     }
 
 
@@ -351,12 +353,12 @@ class LatteAttestationManager: public LatteDispatcher {
       auto check = proto::CommandWrapper::extract_check_property(*cmd);
       auto &ip = check->principal().auth().ip();
       auto port = check->principal().auth().port_lo();
-      auto &prop = check->properties(0);
       if (check->properties_size() == 0) {
         return proto::make_shared_status_response(false, "must provide one property");
       }
+      auto &prop = check->properties(0);
       return proto::make_shared_status_response(
-          metadata_service_->can_access(ip, port, prop, ""), "");
+          metadata_service_->has_property(ip, port, prop, ""), "");
     }
 
     std::shared_ptr<Response> check_attestation(std::shared_ptr<Command> cmd) {

@@ -242,7 +242,7 @@ class AttGuardClient {
       auth->set_ip(ip);
       auth->set_port_lo(port);
       auto resp = post(prepare<proto::Command::CHECK_ATTESTATION>(statement));
-      return resp.extract_attetation();
+      return resp.extract_attestation();
     }
     ////
 
