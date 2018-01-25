@@ -33,10 +33,10 @@ class AttGuardClient {
   public:
     GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(AttGuardClient);
 
-    AttGuardClient(std::string myip): AttGuardClient(myip, DEFAULT_DAEMON_PATH) { }
+    AttGuardClient(std::string myid, std::string myip): AttGuardClient(std::move(myid), std::move(myip), DEFAULT_DAEMON_PATH) { }
 
-    AttGuardClient(std::string myip, std::string daemon_path):
-        myip_(std::move(myip)), daemon_path_(std::move(daemon_path)), sock_(0) {
+    AttGuardClient(std::string myid, std::string myip, std::string daemon_path):
+        myid_(std::move(myid)), myip_(std::move(myip)), daemon_path_(std::move(daemon_path)), sock_(0) {
       redial();
     }
 
@@ -98,7 +98,7 @@ class AttGuardClient {
 
     std::unique_ptr<proto::MetadataConfig> get_metadata_config() {
       proto::Empty placeholder;
-      auto resp = post(prepare<proto::Command::GET_METADATA_CONFIG>(placeholder));
+      auto resp = post(prepare<proto::Command::GET_METADATA_CONFIG>(placeholder, myid_.c_str()));
       return resp.extract_metadata_config();
     }
 
@@ -241,7 +241,7 @@ class AttGuardClient {
       auto auth = p->mutable_auth();
       auth->set_ip(ip);
       auth->set_port_lo(port);
-      auto resp = post(prepare<proto::Command::CHECK_ATTESTATION>(statement));
+      auto resp = post(prepare<proto::Command::CHECK_ATTESTATION>(statement, myid_.c_str()));
       return resp.extract_attestation();
     }
     ////
@@ -251,13 +251,13 @@ class AttGuardClient {
     template<proto::Command::Type type>
     inline int quick_post(
         const typename proto::statement_traits<type>::msg_type &statement) {
-      return status_int<type>(post(prepare<type>(statement)));
+      return status_int<type>(post(prepare<type>(statement, myid_.c_str())));
     }
 
     template<proto::Command::Type type>
     inline std::unique_ptr<proto::Principal> quick_get_principal(
         const typename proto::statement_traits<type>::msg_type &statement) {
-      auto cmd = prepare<type>(statement);
+      auto cmd = prepare<type>(statement, myid_.c_str());
       auto resp = post(cmd);
       return resp.extract_principal();
     }
@@ -292,6 +292,7 @@ class AttGuardClient {
       return proto::ResponseWrapper(result);
     }
 
+    std::string myid_;
     std::string myip_;
     std::string daemon_path_;
     int sock_; 
@@ -306,9 +307,10 @@ static std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> port_usage;
 
 // This must be called if a process intends to become an attester. It will
 // clear stalled information (if any)
-int liblatte_init(int run_as_iaas, const char *daemon_path) {
+int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path) {
   std::string myip;
   if (run_as_iaas) {
+    myid = IAAS_IDENTITY;
     myip = IAAS_IDENTITY;
   } else {
     myip = latte::utils::get_myip();
@@ -318,9 +320,9 @@ int liblatte_init(int run_as_iaas, const char *daemon_path) {
     return -1;
   }
   if (!daemon_path || strcmp(daemon_path, "") == 0) {
-    latte_client = latte::utils::make_unique<latte::AttGuardClient>(myip);
+    latte_client = latte::utils::make_unique<latte::AttGuardClient>(myid, myip);
   } else {
-    latte_client = latte::utils::make_unique<latte::AttGuardClient>(myip, daemon_path);
+    latte_client = latte::utils::make_unique<latte::AttGuardClient>(myid, myip, daemon_path);
   }
   syscall_gate = latte::utils::make_unique<SyscallProxyImpl>();
 

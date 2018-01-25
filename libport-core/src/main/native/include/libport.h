@@ -56,7 +56,7 @@ extern "C" {
 void liblatte_set_log_level(int upto);
 
 
-int liblatte_init(int run_as_iaas, const char *daemon_path);
+int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path);
 int liblatte_create_principal_new(uint64_t uuid, const char *image, const char *config,
     int nport, const char *new_ip);
 int liblatte_create_principal(uint64_t uuid, const char *image, const char *config,

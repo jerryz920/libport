@@ -19,11 +19,12 @@ def dispatch(lib, args):
     method(*args[1:])
 
 if __name__ == "__main__":
-    if argc < 2:
-        print("usage: latte default_ip")
+    if argc < 3:
+        print("usage: latte myid default_ip")
         sys.exit(1)
     liblatte = ctypes.cdll.LoadLibrary("liblatte.so")
-    liblatte.liblatte_init(0, cstr(sys.argv[1].strip()))
+    liblatte.liblatte_init(cstr(sys.argv[1].strip(), 0,
+        cstr(sys.argv[2].strip()))
 
     for line in sys.stdin.readlines():
         if line == "":

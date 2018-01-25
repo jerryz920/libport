@@ -48,6 +48,7 @@ class LatteAttestationManager: public LatteDispatcher {
       std::shared_ptr<Response> result;
       if (handler) {
         try {
+          //// TODO: validate the speaker field if needed
           result = handler(cmd);
         } catch (const std::runtime_error &e) {
           std::string errmsg = "runtime error " + std::string(e.what());
