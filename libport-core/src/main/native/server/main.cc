@@ -4,8 +4,12 @@
 #include "server.h"
 #include "config.h"
 
-int main() {
-  jutils::config::SimpleConfig::create_config("config.txt");
+int main(int argc, char **argv) {
+  const char *config = "config.txt";
+  if (argc > 1) {
+    config = argv[1];
+  }
+  jutils::config::SimpleConfig::create_config(config);
   auto url = latte::config::metadata_service_url();
   latte::init_manager(url);
   auto server = latte::Server(latte::config::local_daemon_path());

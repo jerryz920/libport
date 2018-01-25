@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+
+import sys
+import ctypes
+
+
+def abort(*args, **kargs):
+    print("no such method, abort")
+    sys.exit(2)
+
+
+def cstr(s):
+    return c_char_p(s.encode("utf-8"))
+
+def dispatch(lib, args):
+    if not args[0].startswith("liblatte_"):
+        args[0] = "liblatte_" + args[0]
+    method = getattr(lib, args[0], abort)
+    method(*args[1:])
+
+if __name__ == "__main__":
+    if argc < 2:
+        print("usage: latte default_ip")
+        sys.exit(1)
+    liblatte = ctypes.cdll.LoadLibrary("liblatte.so")
+    liblatte.liblatte_init(0, cstr(sys.argv[1].strip()))
+
+    for line in sys.stdin.readlines():
+        if line == "":
+            pass
+        parts = line.strip().split(" ")
+        dispatch(liblatte, parts)
+

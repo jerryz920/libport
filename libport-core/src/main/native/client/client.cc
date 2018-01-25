@@ -317,7 +317,11 @@ int liblatte_init(int run_as_iaas, const char *daemon_path) {
     latte::log_err("failed to initialize liblatte principal identity");
     return -1;
   }
-  latte_client = latte::utils::make_unique<latte::AttGuardClient>(myip, daemon_path);
+  if (!daemon_path || strcmp(daemon_path, "") == 0) {
+    latte_client = latte::utils::make_unique<latte::AttGuardClient>(myip);
+  } else {
+    latte_client = latte::utils::make_unique<latte::AttGuardClient>(myip, daemon_path);
+  }
   syscall_gate = latte::utils::make_unique<SyscallProxyImpl>();
 
   latte::log("liblatte core initialized for process %d\n", getpid());

@@ -37,6 +37,9 @@ add_subdirectory(client)
 add_subdirectory(server)
 add_subdirectory(tests)
 
+INCLUDE(CPack)
+SET(CPACK_GENERATOR "TGZ")
+SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Yan Zhai") #required
 
 
 #
@@ -89,8 +92,6 @@ add_subdirectory(tests)
 #add_executable(test_integration test_integration.cc)
 #target_link_libraries(test_integration -L/usr/local/lib ${library_dependencies})
 #
-#install(TARGETS port
-#  LIBRARY DESTINATION lib)
 #
 #install(FILES ${PROJECT_SOURCE_DIR}/include/libport.h
 #  DESTINATION include)
