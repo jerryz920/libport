@@ -175,12 +175,13 @@ MetadataServiceClient::MetadataServiceClient(const std::string &server_url,
   myid_(myid) {
   }
 
-std::string MetadataServiceClient::post_new_principal(const std::string& principal_name,
+std::string MetadataServiceClient::post_new_principal(const std::string &speaker,
+    const std::string& principal_name,
     const std::string& principal_ip, int port_min, int port_max,
     const std::string& image_hash, const std::string& configs) {
 
   std::string identity;
-  this->post_statement("/postInstanceSet", myid(), {principal_name, image_hash,
+  this->post_statement("/postInstanceSet", speaker, {principal_name, image_hash,
       "image", utils::format_netaddr(principal_ip, port_min, port_max), configs})
     .then(debug_task())
     .then(json_task("creating principal"))
@@ -200,12 +201,13 @@ std::string MetadataServiceClient::post_new_principal(const std::string& princip
 }
 
 
-void MetadataServiceClient::post_new_image(const std::string& image_hash,
+void MetadataServiceClient::post_new_image(const std::string &speaker,
+    const std::string& image_hash,
         const std::string& source_url,
         const std::string& source_rev,
         const std::string& misc_conf) {
   /* FIXME: Using IAAS_IDENTITY should be a BUG but we will fix them later */
-  this->post_statement("/postAttesterImage", IAAS_IDENTITY, 
+  this->post_statement("/postAttesterImage", speaker, 
       {image_hash, misc_conf})
     .then(debug_task())
     .then([&](web::http::http_response res) -> 
@@ -222,30 +224,33 @@ void MetadataServiceClient::post_new_image(const std::string& image_hash,
     .then(sink_task("posting image_src")).wait();
 }
 
-void MetadataServiceClient::post_object_acl(const std::string& object_id,
+void MetadataServiceClient::post_object_acl(const std::string &speaker,
+    const std::string& object_id,
     const std::string& requirement) {
   // FIXME: this is a problem with SAFE. we temporarily use alice for object
   // acl setting...
   std::string actual_id = object_id;
   if (object_id.find(":") == std::string::npos) {
-    actual_id = "alice:" + object_id;
+    actual_id = speaker + ":" + object_id;
   }
-  this->post_statement("/postObjectAcl", "alice", {actual_id, requirement})
+  this->post_statement("/postObjectAcl", speaker, {actual_id, requirement})
     .then(debug_task())
     .then(sink_task("posting acl")).wait();
 }
 
-void MetadataServiceClient::endorse_image(const std::string& image_hash,
+void MetadataServiceClient::endorse_image(const std::string &speaker,
+    const std::string& image_hash,
     const std::string& endorsement, const std::string& config) {
-  this->post_statement("/postImageProperty", myid(), {image_hash, config, endorsement})
+  this->post_statement("/postImageProperty", speaker, {image_hash, config, endorsement})
     .then(debug_task())
     .then(sink_task("endorsing image")).wait();
 }
 
-void MetadataServiceClient::endorse_membership(const std::string &ip,
+void MetadataServiceClient::endorse_membership(const std::string &speaker,
+    const std::string &ip,
     uint32_t port, const std::string &property, const std::string &config) {
   std::string identity;
-  this->post_statement("/postWorkerSet", myid(), {property,
+  this->post_statement("/postWorkerSet", speaker, {property,
       utils::format_netaddr(ip, port), config})
     .then(debug_task())
     /* This part is workarounded in the proxy
@@ -263,10 +268,11 @@ void MetadataServiceClient::endorse_membership(const std::string &ip,
     .then(sink_task("updating membership")).wait();
 }
 
-void MetadataServiceClient::endorse_membership(const std::string &ip,
+void MetadataServiceClient::endorse_membership(const std::string &speaker,
+    const std::string &ip,
     uint32_t port, uint64_t gn, const std::string &property, const std::string &config) {
   std::string identity;
-  this->post_statement("/postWorkerSet", myid(), {property,
+  this->post_statement("/postWorkerSet", speaker, {property,
       utils::format_netaddr(ip, port), utils::itoa(gn), config})
     .then(debug_task())
     /*
@@ -284,46 +290,52 @@ void MetadataServiceClient::endorse_membership(const std::string &ip,
     .then(sink_task("updating membership")).wait();
 }
 
-void MetadataServiceClient::endorse_builder_on_source(const std::string &source_id,
+void MetadataServiceClient::endorse_builder_on_source(const std::string &speaker,
+    const std::string &source_id,
     const std::string &config) {
-  this->post_statement("/postSourceImage", IAAS_IDENTITY, 
+  this->post_statement("/postSourceImage", speaker, 
       {source_id, config})
     .then(debug_task())
     .then(sink_task("endorsing builder")).wait();
 }
 
-void MetadataServiceClient::endorse_builder(const std::string &image_id,
+void MetadataServiceClient::endorse_builder(const std::string &speaker,
+    const std::string &image_id,
     const std::string &config) {
-  this->post_statement("/postBuilderImage", IAAS_IDENTITY, 
+  this->post_statement("/postBuilderImage", speaker, 
       {image_id, config})
     .then(debug_task())
     .then(sink_task("endorsing builder")).wait();
 }
-void MetadataServiceClient::endorse_attester_on_source(const std::string &source_id,
+void MetadataServiceClient::endorse_attester_on_source(const std::string &speaker,
+    const std::string &source_id,
     const std::string &config) {
-  this->post_statement("/postAttesterSource", IAAS_IDENTITY, 
+  this->post_statement("/postAttesterSource", speaker, 
       {source_id, config})
     .then(debug_task())
     .then(sink_task("endorsing attester")).wait();
 }
 
-void MetadataServiceClient::endorse_attester(const std::string &image_id,
+void MetadataServiceClient::endorse_attester(const std::string &speaker,
+    const std::string &image_id,
     const std::string &config) {
-  this->post_statement("/postAttesterImage", IAAS_IDENTITY, 
+  this->post_statement("/postAttesterImage", speaker, 
       {image_id, config})
     .then(debug_task())
     .then(sink_task("endorsing attester")).wait();
 }
 
-void MetadataServiceClient::endorse_source(const std::string &image_id,
+void MetadataServiceClient::endorse_source(const std::string &speaker,
+    const std::string &image_id,
     const std::string &config, const std::string &source) {
-  this->post_statement("/postImageSource", IAAS_IDENTITY, 
+  this->post_statement("/postImageSource", speaker, 
       {image_id, config, source})
     .then(debug_task())
     .then(sink_task("endorsing source")).wait();
 }
 
-bool MetadataServiceClient::has_property(const std::string& principal_ip,
+bool MetadataServiceClient::has_property(const std::string &,
+    const std::string& principal_ip,
     uint32_t port, const std::string& property, const std::string& bearer) {
   return this->post_statement("/attestAppProperty", ATTEST_IDENTITY, {
       utils::format_netaddr(principal_ip, port), property}, bearer)
@@ -344,7 +356,8 @@ bool MetadataServiceClient::has_property(const std::string& principal_ip,
     }).get();
 }
 
-bool MetadataServiceClient::can_access(const std::string& principal_ip, uint32_t port,
+bool MetadataServiceClient::can_access(const std::string &,
+    const std::string& principal_ip, uint32_t port,
     const std::string& access_object, const std::string& bearer) {
   return this->post_statement("/appAccessesObject", ATTEST_IDENTITY, {
       utils::format_netaddr(principal_ip, port), access_object}, bearer)
@@ -365,7 +378,8 @@ bool MetadataServiceClient::can_access(const std::string& principal_ip, uint32_t
     }).get();
 }
 
-bool MetadataServiceClient::can_worker_access(const std::string& principal_ip, uint32_t port,
+bool MetadataServiceClient::can_worker_access(const std::string &,
+    const std::string& principal_ip, uint32_t port,
     const std::string& access_object, const std::string& bearer) {
   return this->post_statement("/workerAccessesObject", ATTEST_IDENTITY, {
       utils::format_netaddr(principal_ip, port), access_object}, bearer)
@@ -388,9 +402,10 @@ bool MetadataServiceClient::can_worker_access(const std::string& principal_ip, u
 
 
 
-std::string MetadataServiceClient::attest(const std::string &ip,
+std::string MetadataServiceClient::attest(const std::string &speaker,
+    const std::string &ip,
     uint32_t port, const std::string &bearer) {
-  return this->post_statement("/attestInstance", ATTEST_IDENTITY, {
+  return this->post_statement("/attestInstance", speaker, {
       utils::format_netaddr(ip, port)}, bearer)
     .then(debug_task())
     .then(json_task("attest instance"))
@@ -405,12 +420,13 @@ std::string MetadataServiceClient::attest(const std::string &ip,
 }
 
 void MetadataServiceClient::remove_principal(
+    const std::string &speaker,
         const std::string& principal_name,
         const std::string& principal_ip, int port_min,
         int port_max, const std::string& image_hash,
         const std::string& configs)
 {
-  this->post_statement("/retractInstanceSet", myid(), {principal_name, image_hash,
+  this->post_statement("/retractInstanceSet", speaker, {principal_name, image_hash,
       "image", utils::format_netaddr(principal_ip, port_min, port_max), configs})
     .then(debug_task())
     .then(json_task("deleting principal")).wait();

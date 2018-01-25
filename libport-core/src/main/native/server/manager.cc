@@ -148,7 +148,8 @@ class LatteAttestationManager: public LatteDispatcher {
               "principal not found or mal-formed");
       }
       p->set_gn(gn());
-      auto res = metadata_service_->post_new_principal(principal_name(*p),
+
+      auto res = metadata_service_->post_new_principal(cmd->auth(), principal_name(*p),
           p->auth().ip(), p->auth().port_lo(), p->auth().port_hi(),
           p->code().image(), p->code().config().at(LEGACY_CONFIG_KEY));
       p->set_speaker(cmd->pid());
@@ -197,7 +198,7 @@ class LatteAttestationManager: public LatteDispatcher {
             p->id(), maxgn, latest.get(), speaker, cmd->pid(), cmd->uid());
 
         plock_.unlock();
-        metadata_service_->remove_principal(name, ip, plo, phi, image, config);
+        metadata_service_->remove_principal(cmd->auth(),name, ip, plo, phi, image, config);
         return proto::make_shared_status_response(true, "");
       } else {
         plock_.unlock();
@@ -235,7 +236,7 @@ class LatteAttestationManager: public LatteDispatcher {
       auto &image = endorse->id();
       auto &property = endorse->endorsements(0).property();
       auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
-      metadata_service_->endorse_image(image, property, config);
+      metadata_service_->endorse_image(cmd->auth(),image, property, config);
       return proto::make_shared_status_response(true, "");
     }
 
@@ -281,7 +282,7 @@ class LatteAttestationManager: public LatteDispatcher {
       if (acl->policies_size() == 0) {
         return proto::make_shared_status_response(false, "must provide one policy");
       }
-      metadata_service_->post_object_acl(acl->name(), acl->policies(0));
+      metadata_service_->post_object_acl(cmd->auth(), acl->name(), acl->policies(0));
       return proto::make_shared_status_response(true, "");
     }
 
@@ -295,7 +296,7 @@ class LatteAttestationManager: public LatteDispatcher {
       auto target_port = endorse_p->principal().auth().port_lo();
       auto &target_config = endorse_p->principal().code().config().at(LEGACY_CONFIG_KEY);
       auto &statement = endorse_p->endorsements(0);
-      metadata_service_->endorse_membership(target_ip, target_port, gn, statement.property(),
+      metadata_service_->endorse_membership(cmd->auth(), target_ip, target_port, gn, statement.property(),
           target_config);
       return proto::make_shared_status_response(true, "");
     }
@@ -306,10 +307,10 @@ class LatteAttestationManager: public LatteDispatcher {
       auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
       if (endorse->type() == proto::Endorse::SOURCE) {
         /// metadata_service_->endorse_source(id, statement);
-        metadata_service_->endorse_attester_on_source(id, config);
+        metadata_service_->endorse_attester_on_source(cmd->auth(),id, config);
       } else {
         //// Need add a type
-        metadata_service_->endorse_attester(id, config);
+        metadata_service_->endorse_attester(cmd->auth(),id, config);
       }
       return proto::make_shared_status_response(true, "");
     }
@@ -323,10 +324,10 @@ class LatteAttestationManager: public LatteDispatcher {
       auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
       if (endorse->type() == proto::Endorse::SOURCE) {
         /// metadata_service_->endorse_source(id, statement);
-        metadata_service_->endorse_builder_on_source(id, config);
+        metadata_service_->endorse_builder_on_source(cmd->auth(),id, config);
       } else {
         //// Need add a type
-        metadata_service_->endorse_builder(id, config);
+        metadata_service_->endorse_builder(cmd->auth(),id, config);
       }
       return proto::make_shared_status_response(true, "");
     }
@@ -344,7 +345,7 @@ class LatteAttestationManager: public LatteDispatcher {
         return proto::make_shared_status_response(false, "source endorse this is image only");
       } else {
         //// Need add a type
-        metadata_service_->endorse_image(id, statement.property(), config);
+        metadata_service_->endorse_image(cmd->auth(), id, statement.property(), config);
       }
       return proto::make_shared_status_response(true, "");
     }
@@ -358,7 +359,7 @@ class LatteAttestationManager: public LatteDispatcher {
       }
       auto &prop = check->properties(0);
       return proto::make_shared_status_response(
-          metadata_service_->has_property(ip, port, prop, ""), "");
+          metadata_service_->has_property(cmd->auth(), ip, port, prop, ""), "");
     }
 
     std::shared_ptr<Response> check_attestation(std::shared_ptr<Command> cmd) {
@@ -366,7 +367,7 @@ class LatteAttestationManager: public LatteDispatcher {
       auto &ip = attest->principal().auth().ip();
       auto port = attest->principal().auth().port_lo();
       proto::Attestation a;
-      a.set_content(metadata_service_->attest(ip, port, ""));
+      a.set_content(metadata_service_->attest(cmd->auth(), ip, port, ""));
       return proto::make_shared_attestation_response(a);
     }
 
@@ -379,7 +380,7 @@ class LatteAttestationManager: public LatteDispatcher {
       }
       auto &object = check->objects(0);
       return proto::make_shared_status_response(
-          metadata_service_->can_access(ip, port, object, ""), "");
+          metadata_service_->can_access(cmd->auth(),ip, port, object, ""), "");
     }
 
     std::shared_ptr<Response> check_worker_access(std::shared_ptr<Command> cmd) {
@@ -391,7 +392,7 @@ class LatteAttestationManager: public LatteDispatcher {
       }
       auto &object = check->objects(0);
       return proto::make_shared_status_response(
-          metadata_service_->can_worker_access(ip, port, object, ""), "");
+          metadata_service_->can_worker_access(cmd->auth(),ip, port, object, ""), "");
     }
 
     void add_principal(uint64_t id, std::shared_ptr<proto::Principal> p) {

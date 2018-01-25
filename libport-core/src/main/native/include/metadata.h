@@ -58,65 +58,80 @@ class MetadataServiceClient {
 
 
     /// the byte array is just 
-    virtual std::string post_new_principal(
+    virtual std::string post_new_principal(const std::string &speaker,
+
         const std::string& principal_name,
         const std::string& principal_ip, int port_min,
         int port_max, const std::string& image_hash,
         const std::string& configs);
 
-    virtual void post_new_image(const std::string& image_hash,
+    virtual void post_new_image(const std::string &speaker,
+        const std::string& image_hash,
         const std::string& source_url,
         const std::string& source_rev,
         const std::string& misc_conf);
 
-    virtual void remove_principal(
+    virtual void remove_principal(const std::string &speaker,
         const std::string& principal_name,
         const std::string& principal_ip, int port_min,
         int port_max, const std::string& image_hash,
         const std::string& configs);
-//
-//    void remove_image(const std::string& image_hash);
+    //
+    //    void remove_image(const std::string& image_hash);
 
-    virtual void post_object_acl(const std::string& obj_id,
+    virtual void post_object_acl(const std::string &speaker,
+        const std::string& obj_id,
         const std::string& requirements);
 
     //void endorse_principal(const std::string& host_ip, int port_min,
     //    int port_max, const std::string& endorsement);
 
-    virtual void endorse_image(const std::string& image_hash,
+    virtual void endorse_image(const std::string &speaker,
+        const std::string& image_hash,
         const std::string& endorsement, const std::string& config);
 
-    virtual void endorse_attester(const std::string &image_id,
+    virtual void endorse_attester(const std::string &speaker,
+        const std::string &image_id,
         const std::string &config);
 
-    virtual void endorse_builder(const std::string &image_id,
+    virtual void endorse_builder(const std::string &speaker,
+        const std::string &image_id,
         const std::string &config);
 
-    virtual void endorse_membership(const std::string &ip, uint32_t port,
+    virtual void endorse_membership(const std::string &speaker,
+        const std::string &ip, uint32_t port,
         const std::string &endorse, const std::string &config);
-    virtual void endorse_membership(const std::string &ip, uint32_t port,
+    virtual void endorse_membership(const std::string &speaker,
+        const std::string &ip, uint32_t port,
         uint64_t gn, const std::string &endorse, const std::string &config);
 
-    virtual void endorse_attester_on_source(const std::string &source_id,
+    virtual void endorse_attester_on_source(const std::string &speaker,
+        const std::string &source_id,
         const std::string &config);
 
-    virtual void endorse_builder_on_source(const std::string &source_id,
+    virtual void endorse_builder_on_source(const std::string &speaker,
+        const std::string &source_id,
         const std::string &config);
 
-    virtual void endorse_source(const std::string &image_id,
+    virtual void endorse_source(const std::string &speaker,
+        const std::string &image_id,
         const std::string &config, const std::string &source);
 
     //void endorse_source(const std::string& source_url,
     //    const std::string& source_revision, const std::string& endorsement);
 
     // bearer should use the value returned by "post_new_principal"
-    virtual bool has_property(const std::string& principal_ip, uint32_t port,
+    virtual bool has_property(const std::string &speaker,
+        const std::string& principal_ip, uint32_t port,
         const std::string& property, const std::string& bearer_ref);
-    virtual bool can_access(const std::string& principal_ip, uint32_t port,
+    virtual bool can_access(const std::string &speaker,
+        const std::string& principal_ip, uint32_t port,
         const std::string& access_object, const std::string& bearer_ref);
-    virtual std::string attest(const std::string &principal_ip, uint32_t port,
+    virtual std::string attest(const std::string &speaker,
+        const std::string &principal_ip, uint32_t port,
         const std::string &bearer);
-    virtual bool can_worker_access(const std::string &ip, uint32_t port,
+    virtual bool can_worker_access(const std::string &speaker,
+        const std::string &ip, uint32_t port,
         const std::string &object, const std::string &bearer);
 
     const std::string& myid() const { return myid_; }

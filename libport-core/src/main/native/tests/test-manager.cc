@@ -89,21 +89,21 @@ BOOST_AUTO_TEST_CASE(test_create_principal) {
   for (auto i = mclient->post_new_principal_call_args.begin();
       i != mclient->post_new_principal_call_args.end(); ++i) {
     if (index == 0) {
-    BOOST_CHECK_EQUAL(std::get<0>(*i), "0:0"); // pid:gn
-    BOOST_CHECK_EQUAL(std::get<2>(*i), 10000 + index * 100);
-    BOOST_CHECK_EQUAL(std::get<3>(*i), 10000 + index * 100 + 100);
+    BOOST_CHECK_EQUAL(std::get<1>(*i), "0:0"); // pid:gn
+    BOOST_CHECK_EQUAL(std::get<3>(*i), 10000 + index * 100);
+    BOOST_CHECK_EQUAL(std::get<4>(*i), 10000 + index * 100 + 100);
     } else if (index == 1) {
-    BOOST_CHECK_EQUAL(std::get<0>(*i), "1:1"); // pid:gn
-    BOOST_CHECK_EQUAL(std::get<2>(*i), 10000 + index * 100);
-    BOOST_CHECK_EQUAL(std::get<3>(*i), 10000 + index * 100 + 100);
+    BOOST_CHECK_EQUAL(std::get<1>(*i), "1:1"); // pid:gn
+    BOOST_CHECK_EQUAL(std::get<3>(*i), 10000 + index * 100);
+    BOOST_CHECK_EQUAL(std::get<4>(*i), 10000 + index * 100 + 100);
     } else {
-    BOOST_CHECK_EQUAL(std::get<0>(*i), "0:2"); // pid:gn
-    BOOST_CHECK_EQUAL(std::get<2>(*i), 10000 + 0 * 100);
-    BOOST_CHECK_EQUAL(std::get<3>(*i), 10000 + 0 * 100 + 100);
+    BOOST_CHECK_EQUAL(std::get<1>(*i), "0:2"); // pid:gn
+    BOOST_CHECK_EQUAL(std::get<3>(*i), 10000 + 0 * 100);
+    BOOST_CHECK_EQUAL(std::get<4>(*i), 10000 + 0 * 100 + 100);
     }
-    BOOST_CHECK_EQUAL(std::get<1>(*i), "1.1.1.1");
-    BOOST_CHECK_EQUAL(std::get<4>(*i), "image");
-    BOOST_CHECK_EQUAL(std::get<5>(*i), "*");
+    BOOST_CHECK_EQUAL(std::get<2>(*i), "1.1.1.1");
+    BOOST_CHECK_EQUAL(std::get<5>(*i), "image");
+    BOOST_CHECK_EQUAL(std::get<6>(*i), "*");
     index++;
   }
 }
@@ -275,8 +275,8 @@ BOOST_AUTO_TEST_CASE(test_post_object_acl) {
       resp_ok);
   BOOST_REQUIRE_EQUAL(mclient->post_object_acl_call_count, 1);
   auto &callarg = *mclient->post_object_acl_call_args.begin();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg), "obj");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg), "property");
+  BOOST_CHECK_EQUAL(std::get<1>(callarg), "obj");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg), "property");
 }
 
 BOOST_AUTO_TEST_CASE(test_endorse_image) {
@@ -322,9 +322,9 @@ BOOST_AUTO_TEST_CASE(test_endorse_image) {
   BOOST_REQUIRE_EQUAL(mclient->endorse_image_call_count, 1);
 
   auto &callarg = *mclient->endorse_image_call_args.begin();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg), "image");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg), "attester");
-  BOOST_CHECK_EQUAL(std::get<2>(callarg), "*");
+  BOOST_CHECK_EQUAL(std::get<1>(callarg), "image");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg), "attester");
+  BOOST_CHECK_EQUAL(std::get<3>(callarg), "*");
 }
 
 BOOST_AUTO_TEST_CASE(test_has_property) {
@@ -361,9 +361,9 @@ BOOST_AUTO_TEST_CASE(test_has_property) {
   BOOST_REQUIRE_EQUAL(mclient->has_property_call_count, 1);
 
   auto &callarg = *mclient->has_property_call_args.begin();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg), "1.1.1.1");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg), 100);
-  BOOST_CHECK_EQUAL(std::get<2>(callarg), "ppp");
+  BOOST_CHECK_EQUAL(std::get<1>(callarg), "1.1.1.1");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg), 100);
+  BOOST_CHECK_EQUAL(std::get<3>(callarg), "ppp");
 }
 
 BOOST_AUTO_TEST_CASE(test_can_access) {
@@ -400,9 +400,9 @@ BOOST_AUTO_TEST_CASE(test_can_access) {
   BOOST_REQUIRE_EQUAL(mclient->can_access_call_count, 1);
 
   auto &callarg = *mclient->can_access_call_args.begin();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg), "1.1.1.1");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg), 100);
-  BOOST_CHECK_EQUAL(std::get<2>(callarg), "ooo");
+  BOOST_CHECK_EQUAL(std::get<1>(callarg), "1.1.1.1");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg), 100);
+  BOOST_CHECK_EQUAL(std::get<3>(callarg), "ooo");
 }
 
 static void _test_endorse_attester(std::shared_ptr<latte::LatteDispatcher> &manager,
@@ -426,14 +426,14 @@ BOOST_AUTO_TEST_CASE(test_endorse_attester) {
   _test_endorse_attester(manager, latte::proto::Endorse::SOURCE);
   BOOST_REQUIRE_EQUAL(mclient->endorse_attester_on_source_call_count, 1);
   auto &callarg = mclient->endorse_attester_on_source_call_args.front();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg), "endorse_attester");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg), "*");
+  BOOST_CHECK_EQUAL(std::get<1>(callarg), "endorse_attester");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg), "*");
 
   _test_endorse_attester(manager, latte::proto::Endorse::IMAGE);
   BOOST_REQUIRE_EQUAL(mclient->endorse_attester_call_count, 1);
   auto &callarg1 = mclient->endorse_attester_call_args.front();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg1), "endorse_attester");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg1), "*");
+  BOOST_CHECK_EQUAL(std::get<1>(callarg1), "endorse_attester");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg1), "*");
 
 }
 
@@ -474,11 +474,11 @@ BOOST_AUTO_TEST_CASE(test_endorse_membership) {
   _test_endorse_membership(manager, false);
   BOOST_REQUIRE_EQUAL(mclient->endorse_membership_call_count, 1);
   auto &callarg = mclient->endorse_membership_call_args.front();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg), "1.1.1.1");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg), 100);
-  BOOST_CHECK_EQUAL(std::get<2>(callarg), 10010);
-  BOOST_CHECK_EQUAL(std::get<3>(callarg), "membership");
-  BOOST_CHECK_EQUAL(std::get<4>(callarg), "*");
+  BOOST_CHECK_EQUAL(std::get<1>(callarg), "1.1.1.1");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg), 100);
+  BOOST_CHECK_EQUAL(std::get<3>(callarg), 10010);
+  BOOST_CHECK_EQUAL(std::get<4>(callarg), "membership");
+  BOOST_CHECK_EQUAL(std::get<5>(callarg), "*");
 }
 
 BOOST_AUTO_TEST_CASE(test_attest) {
@@ -496,8 +496,8 @@ BOOST_AUTO_TEST_CASE(test_attest) {
       resp_attestation);
   BOOST_REQUIRE_EQUAL(mclient->attest_call_count, 1);
   auto &callarg = mclient->attest_call_args.front();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg), "1.1.1.1");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg), 100);
+  BOOST_CHECK_EQUAL(std::get<1>(callarg), "1.1.1.1");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg), 100);
 }
 
 BOOST_AUTO_TEST_CASE(test_can_worker_access) {
@@ -530,7 +530,7 @@ BOOST_AUTO_TEST_CASE(test_can_worker_access) {
       resp_ok);
   BOOST_REQUIRE_EQUAL(mclient->can_worker_access_call_count, 1);
   auto &callarg = mclient->can_worker_access_call_args.front();
-  BOOST_CHECK_EQUAL(std::get<0>(callarg), "1.1.1.1");
-  BOOST_CHECK_EQUAL(std::get<1>(callarg), 100);
-  BOOST_CHECK_EQUAL(std::get<2>(callarg), "obj");
+  BOOST_CHECK_EQUAL(std::get<1>(callarg), "1.1.1.1");
+  BOOST_CHECK_EQUAL(std::get<2>(callarg), 100);
+  BOOST_CHECK_EQUAL(std::get<3>(callarg), "obj");
 }

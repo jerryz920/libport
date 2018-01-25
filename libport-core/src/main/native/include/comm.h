@@ -34,6 +34,7 @@
 #ifndef _LIBPORT_PROTO_COMM_H
 #define _LIBPORT_PROTO_COMM_H
 
+#include "config.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "utils.h"
@@ -44,7 +45,6 @@ namespace latte {
   using google::protobuf::Message;
   using google::protobuf::io::CodedOutputStream;
   using google::protobuf::io::CodedInputStream;
-    
 
   static constexpr int COMM_HEADER_SZ = 8;
 
@@ -86,10 +86,12 @@ namespace latte {
 
 template<proto::Command::Type type>
 proto::Command prepare(
-    const typename proto::statement_traits<type>::msg_type &statement) {
+    const typename proto::statement_traits<type>::msg_type &statement,
+    const char *auth = DEFAULT_SPEAKER) {
   proto::Command cmd;
   cmd.set_id(utils::gen_rand_uint64());
   cmd.set_type(type);
+  cmd.set_auth(auth);
   auto stmt_field = cmd.mutable_statement();
   stmt_field->PackFrom(statement);
   return cmd;

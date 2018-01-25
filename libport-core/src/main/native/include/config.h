@@ -7,6 +7,7 @@ namespace latte {
 /// to pass configure we now have a plain string, but we will leave
 //space for the map.
 constexpr const char *LEGACY_CONFIG_KEY = "LEGACY_CONFIG_STRING";
+constexpr const char *DEFAULT_SPEAKER = "default-speaker";
 
 /// For object smaller than such size we will use pre-allocated buffer
 // for larger one we dynamic allocate
