@@ -6,7 +6,7 @@ set (libport_VERSION_MAJOR 1)
 set (libport_VERSION_MINOR 0)
 set (LIBPORT_INSTALL_PATH "/usr" CACHE PATH "prefix of installation")
 set (CMAKE_INSTALL_PREFIX ${LIBPORT_INSTALL_PATH} CACHE INTERNAL "prefix prepended to install directories" FORCE)
-add_definitions("-Wall -std=c++11")
+add_definitions("-Wall -ggdb -std=c++11")
 
 find_program(GOTOOL go)
 find_package(Boost 1.54 REQUIRED COMPONENTS unit_test_framework system)

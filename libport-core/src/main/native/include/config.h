@@ -70,9 +70,10 @@ static inline const std::string &local_daemon_path() {
   return config_cache_.local_ep;
 }
 
+void load_config(const char *path);
+
 
 }
 }
-
 
 #endif

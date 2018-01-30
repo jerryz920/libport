@@ -9,7 +9,7 @@ namespace config {
 
 ConfigItems config_cache_;
 
-void load_config(const std::string &path) {
+void load_config(const char *path) {
   auto &conf = jutils::config::SimpleConfig::create_config(path);
   const std::string *myid = conf.get(MY_ID);
   if (!myid) {
