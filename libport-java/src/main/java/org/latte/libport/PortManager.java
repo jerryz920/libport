@@ -24,7 +24,7 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid1 = f.getInt(p);
-	    LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid1, 30000, 32000);
+	    LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid1, 40500, 42000);
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(pid1, "image_p1", "config-p1", myip, 30000, 32000);
             int ret = p.waitFor();
             if (ret < 0) {
@@ -47,7 +47,7 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
-	    System.err.println("syscall for p2? " + LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid, 32001, 33000));
+	    System.err.println("syscall for p2? " + LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid, 42001, 43000));
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
 		pid, "image_p2", "config-p2", myip, 32001, 33000);
             int ret = p.waitFor();
@@ -71,7 +71,7 @@ public class PortManager
             f.setAccessible(true);
             pid = f.getInt(p);
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
-		pid, "image_attester", "config-attester", myip, 30000, 40000);
+		pid, "image_attester", "config-attester", myip, 42000, 46000);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect Attester to exit abnormally");
@@ -147,7 +147,7 @@ public class PortManager
         LibPort.INSTANCE.liblatte_set_log_level(LibPort.LOG_DEBUG);
         System.err.println("preparing");
 
-        LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, 0, 30000, 40000);
+        LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, 0, 40000, 50000);
         Utils.reportLocalPorts("test-main");
         LibPort.INSTANCE.liblatte_init("", 1, "");
 	byte[] b = new byte[128];
