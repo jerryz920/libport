@@ -27,7 +27,7 @@ public class PortManager
 	    LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid1, 40500, 42000);
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(pid1, "image_p1", "*", myip, 40000, 42000);
             int ret = p.waitFor();
-            if (ret < 0) {
+            if (ret != 0) {
                 System.err.println("expect P1 to exit normally");
             }
             //LibPort.INSTANCE.liblatte_delete_principal(pid1);
@@ -88,7 +88,7 @@ public class PortManager
             OutputStream out = s.getOutputStream();
             InetAddress addr = s.getInetAddress();
             int port = s.getPort();
-            int value = LibPort.INSTANCE.liblatte_check_access(myip, port, "alice:object");
+            int value = LibPort.INSTANCE.liblatte_check_access(myip, port, "alice:newobject");
             System.err.println("recevie request from " + myip + ":" + port + "; attest val " + value);
             /// no access (0) -> return abnormally (1)
             // accessible (1) -> return normally (0)
@@ -158,6 +158,7 @@ public class PortManager
         startServerThread();
         LibPort.INSTANCE.liblatte_set_log_level(LibPort.LOG_DEBUG);
         System.err.println("preparing");
+	post_acl();
 
         LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, 0, 40000, 50000);
         Utils.reportLocalPorts("test-main");
@@ -175,7 +176,6 @@ public class PortManager
         LibPort.INSTANCE.liblatte_endorse_attester("image_attester", "*");
         LibPort.INSTANCE.liblatte_endorse_image("image_p2", "*", 
 	    "git://github.com/jerryz920/p1");
-        LibPort.INSTANCE.liblatte_post_object_acl("alice:object", "access");
         System.err.println("after posting object acl");
 
         testP1();
