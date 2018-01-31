@@ -139,6 +139,18 @@ public class PortManager
         }).start();
     }
 
+    void post_acl() {
+        ProcessBuilder pb = new ProcessBuilder("/usr/bin/latte_exec", "/usr/bin/java", "-cp", "libport.jar", "org.latte.libport.Alice");
+        try {
+            Process p = pb.start();
+            int ret = p.waitFor();
+            if (ret != 0) {
+                System.err.println("expect Alice to exit normally");
+            }
+        } catch (Throwable e) {
+        }
+    }
+
 
     public static void main( String[] args ) 
     {
