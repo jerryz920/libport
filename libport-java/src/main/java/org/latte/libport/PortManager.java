@@ -47,7 +47,7 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
-	    LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid, 32000, 34000);
+	    System.err.println("syscall for p2? " + LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid, 32000, 34000))
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
 		pid, "image_p2", "config-p2", myip, 32000, 34000);
             int ret = p.waitFor();
