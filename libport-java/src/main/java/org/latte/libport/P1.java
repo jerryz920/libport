@@ -12,7 +12,11 @@ public class P1 {
     public static void main(String []args)
     {
         int pid = LibC.INSTANCE.getpid();
-	TimeUnit.MILLISECONDS.sleep(100);
+	try {
+	  TimeUnit.MILLISECONDS.sleep(100);
+	} catch (InterruptedException e) {
+
+	}
         Utils.reportLocalPorts("test-main" + pid);
         int value = 0;
         try {
