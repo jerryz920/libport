@@ -17,7 +17,7 @@ public class Attester {
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid1 = f.getInt(p);
-            LibPort.INSTANCE.create_principal(pid1, "image_p3", "config-p3", 20);
+            LibPort.INSTANCE.liblatte_create_principal(pid1, "image_p3", "config-p3", 20);
             int ret = p.waitFor();
             if (ret < 0) {
                 System.err.println("expect P3 to exit normally");
@@ -38,7 +38,7 @@ public class Attester {
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
-            LibPort.INSTANCE.create_principal(pid, "image_p4", "config-p4", 20);
+            LibPort.INSTANCE.liblatte_create_principal(pid, "image_p4", "config-p4", 20);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect P4 to exit abnormally");
@@ -53,11 +53,14 @@ public class Attester {
         int pid = LibC.INSTANCE.getpid();
         Utils.reportLocalPorts("attester" + pid);
         System.err.println("initialize Attester");
-        LibPort.INSTANCE.libport_init("http://10.10.1.39:7777",
-                "/tmp/libport-javawrapper" + pid, 0);
-        LibPort.INSTANCE.create_image("image_p3", "git://github.com/jerryz920/p2", "C27571ADE", "");
-        LibPort.INSTANCE.endorse_image("image_p3", "access");
-        LibPort.INSTANCE.create_image("image_p4", "git://github.com/jerryz920/p2", "C27571ADE", "");
+        LibPort.INSTANCE.liblatte_init("attester" + pid, 0, "");
+        LibPort.INSTANCE.liblatte_endorse_attester("image_p3", "*");
+        LibPort.INSTANCE.liblatte_endorse_image("image_p3", "*", 
+	    "git://github.com/jerryz920/p2");
+        LibPort.INSTANCE.liblatte_endorse_image("image_p3", "*", "access");
+        LibPort.INSTANCE.liblatte_endorse_attester("image_p4", "*");
+        LibPort.INSTANCE.liblatte_endorse_image("image_p4", "*", 
+	    "git://github.com/jerryz920/p2");
         testP1();
         System.err.println("after attester P1");
         testP2();

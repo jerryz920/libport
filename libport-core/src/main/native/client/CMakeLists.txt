@@ -6,3 +6,5 @@ install(TARGETS latte
   LIBRARY DESTINATION lib)
 install(FILES ${PROJECT_SOURCE_DIR}/client/latte
   DESTINATION bin)
+install(FILES ${PROJECT_SOURCE_DIR}/include/libport.h
+  DESTINATION include)

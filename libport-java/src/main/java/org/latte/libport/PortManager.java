@@ -23,12 +23,12 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid1 = f.getInt(p);
-            LibPort.INSTANCE.create_principal(pid1, "image_p1", "config-p1", 20);
+            LibPort.INSTANCE.liblatte_create_principal(pid1, "image_p1", "config-p1", 20);
             int ret = p.waitFor();
             if (ret < 0) {
                 System.err.println("expect P1 to exit normally");
             }
-            LibPort.INSTANCE.delete_principal(pid1);
+            LibPort.INSTANCE.liblatte_delete_principal(pid1);
         } catch (Throwable e) {
             throw new RuntimeException("can not get pid of P1");
         }
@@ -45,12 +45,12 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
-            LibPort.INSTANCE.create_principal(pid, "image_p2", "config-p2", 20);
+            LibPort.INSTANCE.liblatte_create_principal(pid, "image_p2", "config-p2", 20);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect P2 to exit abnormally");
             }
-            LibPort.INSTANCE.delete_principal(pid);
+            LibPort.INSTANCE.liblatte_delete_principal(pid);
         } catch (Throwable e) {
             throw new RuntimeException("can not get pid of P2");
         }
@@ -66,7 +66,7 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
-            LibPort.INSTANCE.create_principal(pid, "image_attester", "config-attester", 100);
+            LibPort.INSTANCE.liblatte_create_principal(pid, "image_attester", "config-attester", 100);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect Attester to exit abnormally");
@@ -84,7 +84,7 @@ public class PortManager
             InetAddress addr = s.getInetAddress();
             String hostIP = addr.getHostAddress();
             int port = s.getPort();
-            int value = LibPort.INSTANCE.attest_principal_access(hostIP, port, "alice:access");
+            int value = LibPort.INSTANCE.liblatte_check_access(hostIP, port, "alice:access");
             System.err.println("recevie request from " + hostIP + ":" + port + "; attest val " + value);
             /// no access (0) -> return abnormally (1)
             // accessible (1) -> return normally (0)
@@ -140,17 +140,20 @@ public class PortManager
     {
         int pid = LibC.INSTANCE.getpid();
         startServerThread();
-        LibPort.INSTANCE.libport_set_log_level(LibPort.LOG_DEBUG);
+        LibPort.INSTANCE.liblatte_set_log_level(LibPort.LOG_DEBUG);
         System.err.println("preparing");
 
         LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, 0, 30000, 40000);
         Utils.reportLocalPorts("test-main");
-        LibPort.INSTANCE.libport_init("http://10.10.1.39:7777",
-                "/tmp/libport-javawrapper" + pid, 1);
-        LibPort.INSTANCE.create_image("image_p1", "git://github.com/jerryz920/p1", "C27571ADE", "");
-        LibPort.INSTANCE.endorse_image("image_p1", "access");
-        LibPort.INSTANCE.create_image("image_p2", "git://github.com/jerryz920/p1", "C27571ADE", "");
-        LibPort.INSTANCE.post_object_acl("alice:access", "access");
+        LibPort.INSTANCE.liblatte_init("iaas", 1, "");
+        LibPort.INSTANCE.liblatte_endorse_attester("image_p1", "*");
+        LibPort.INSTANCE.liblatte_endorse_image("image_p1", "*", 
+	    "git://github.com/jerryz920/p1");
+        LibPort.INSTANCE.liblatte_endorse_image("image_p1", "*", "access");
+        LibPort.INSTANCE.liblatte_endorse_attester("image_p2", "*");
+        LibPort.INSTANCE.liblatte_endorse_image("image_p2", "*", 
+	    "git://github.com/jerryz920/p1");
+        LibPort.INSTANCE.liblatte_post_object_acl("alice:access", "access");
         System.err.println("after posting object acl");
 
         testP1();
