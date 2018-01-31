@@ -1,0 +1,22 @@
+#!/bin/bash
+IAAS="152.3.145.38:444"
+
+. user1rc
+imageid=`glance image-list | grep docker | awk -F \| '{print $2}' | tr -d \ `
+
+
+./latte $IAAS ../build/vm1.sock <<EOF
+create 1 $imageid * 192.1.0.1 1 65535
+create 2 $imageid * 192.1.0.2 1 65535
+create 3 $imageid * 192.1.0.3 1 65535
+create 4 $imageid * 192.1.0.4 1 65535
+create 5 $imageid * 192.1.0.5 1 65535
+create 6 $imageid * 192.1.0.6 1 65535
+create 7 $imageid * 192.1.0.7 1 65535
+create 8 $imageid * 192.1.0.8 1 65535
+create 9 $imageid * 192.1.0.9 1 65535
+create 10 $imageid * 192.1.0.10 1 65535
+create 11 $imageid * 192.1.0.11 1 65535
+endorse_attester $imageid 1
+endorse_image $imageid * https://github.com/jerryz920/boot2docker/#b9f4063
+EOF
