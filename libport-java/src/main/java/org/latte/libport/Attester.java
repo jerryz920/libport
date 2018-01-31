@@ -53,7 +53,7 @@ public class Attester {
         int pid = LibC.INSTANCE.getpid();
         Utils.reportLocalPorts("attester" + pid);
         System.err.println("initialize Attester");
-        LibPort.INSTANCE.liblatte_init("attester" + pid, 0, "");
+        LibPort.INSTANCE.liblatte_init("", 0, "");
         LibPort.INSTANCE.liblatte_endorse_attester("image_p3", "*");
         LibPort.INSTANCE.liblatte_endorse_image("image_p3", "*", 
 	    "git://github.com/jerryz920/p2");

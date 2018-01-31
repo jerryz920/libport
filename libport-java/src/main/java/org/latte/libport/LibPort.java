@@ -26,8 +26,8 @@ public interface LibPort extends Library
   int liblatte_check_worker_access(String ip, int port, String object);
   int liblatte_check_property(String ip, int port, String property);
   int liblatte_check_access(String ip, int port, String object);
-  int liblatte_authip(Pointer ip, int maxlen);
-  int liblatte_speaker(Pointer speaker, int maxlen);
+  int liblatte_authip(byte[] ip, int maxlen);
+  int liblatte_speaker(byte[] speaker, int maxlen);
   void liblatte_set_log_level(int upto);
 }
 

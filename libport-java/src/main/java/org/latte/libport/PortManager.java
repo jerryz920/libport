@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 
+import com.sun.jna.Native;
 
 public class PortManager
 {
@@ -23,7 +24,7 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid1 = f.getInt(p);
-            LibPort.INSTANCE.liblatte_create_principal(pid1, "image_p1", "config-p1", 20);
+            LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(pid1, "image_p1", "config-p1", myip, 30000, 32000);
             int ret = p.waitFor();
             if (ret < 0) {
                 System.err.println("expect P1 to exit normally");
@@ -45,7 +46,8 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
-            LibPort.INSTANCE.liblatte_create_principal(pid, "image_p2", "config-p2", 20);
+            LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
+		pid, "image_p2", "config-p2", myip, 32000, 34000);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect P2 to exit abnormally");
@@ -66,7 +68,8 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
-            LibPort.INSTANCE.liblatte_create_principal(pid, "image_attester", "config-attester", 100);
+            LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
+		pid, "image_attester", "config-attester", myip, 30000, 40000);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect Attester to exit abnormally");
@@ -145,7 +148,12 @@ public class PortManager
 
         LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, 0, 30000, 40000);
         Utils.reportLocalPorts("test-main");
-        LibPort.INSTANCE.liblatte_init("iaas", 1, "");
+        LibPort.INSTANCE.liblatte_init("", 1, "");
+	byte[] b = new byte[128];
+	LibPort.INSTANCE.liblatte_authip(b, 100);
+	myip = Native.toString(b);
+
+	System.err.println("myip = " + myip);
         LibPort.INSTANCE.liblatte_endorse_attester("image_p1", "*");
         LibPort.INSTANCE.liblatte_endorse_image("image_p1", "*", 
 	    "git://github.com/jerryz920/p1");
@@ -169,4 +177,5 @@ public class PortManager
         running = false;
     }
     private static boolean running = true;
+    private static String myip = "";
 }
