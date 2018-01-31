@@ -1,5 +1,6 @@
 
-for n in /openstack/git/libport/libport-core/src/main/native/build.Debug/libport.so \
+for n in /openstack/git/libport/libport-core/src/main/native/build.Debug/server/liblatte.so \
+  /usr/local/lib/libprotobuf.so.15 \
  /lib/x86_64-linux-gnu/libpthread.so.0 \
  /usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
  /lib/x86_64-linux-gnu/libgcc_s.so.1 \
@@ -9,7 +10,8 @@ for n in /openstack/git/libport/libport-core/src/main/native/build.Debug/libport
  /lib/x86_64-linux-gnu/libm.so.6 \
  /usr/local/lib/libcpprest.so.2.9 \
  /lib/x86_64-linux-gnu/libdl.so.2  ; do
- docker-machine scp $n ${1:-v1}:
+ scp -i /local/data-population/key1 $n docker@${1:-v1}:
  done
 
- docker-machine ssh v1
+
+

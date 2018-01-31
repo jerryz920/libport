@@ -324,17 +324,24 @@ class AttGuardClient {
 static std::unique_ptr<latte::AttGuardClient> latte_client; 
 static std::unique_ptr<SyscallProxy> syscall_gate;
 static std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> port_usage;
+static std::string auth_speaker;
+static std::string auth_ip;
 
 
 // This must be called if a process intends to become an attester. It will
 // clear stalled information (if any)
 int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path) {
   std::string myip;
+  syscall_gate = latte::utils::make_unique<SyscallProxyImpl>();
   if (run_as_iaas) {
     myid = IAAS_IDENTITY;
-    myip = IAAS_IDENTITY;
+    myip = "must_provide_ip_in_creation_as_iaas";
+    auth_ip = myip;
+    auth_speaker = myid;
   } else {
     myip = latte::utils::get_myip();
+    auth_ip = myip;
+    auth_speaker = myid;
   }
   if (myip.compare("") == 0) {
     latte::log_err("failed to initialize liblatte principal identity");
@@ -345,7 +352,6 @@ int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path) {
   } else {
     latte_client = latte::utils::make_unique<latte::AttGuardClient>(myid, myip, daemon_path);
   }
-  syscall_gate = latte::utils::make_unique<SyscallProxyImpl>();
 
   latte::log("liblatte core initialized for process %d\n", getpid());
   return 0;
@@ -667,3 +673,21 @@ char* liblatte_check_attestation(const char *ip, uint32_t port, char **attestati
   return latte::proto::wrap_proto_msg(*att, attestation, size);
 }
 
+
+int liblatte_speaker(char *speaker, int max_len) {
+  size_t sz = max_len;
+  if (sz > auth_speaker.size()) {
+    sz = auth_speaker.size();
+  }
+  strncpy(speaker, auth_speaker.c_str(), sz);
+  return 0;
+}
+
+int liblatte_authip(char *ip, int max_len) {
+  size_t sz = max_len;
+  if (sz > auth_ip.size()) {
+    sz = auth_ip.size();
+  }
+  strncpy(ip, auth_ip.c_str(), sz);
+  return 0;
+}
