@@ -24,6 +24,7 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid1 = f.getInt(p);
+	    LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid1, 30000, 32000);
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(pid1, "image_p1", "config-p1", myip, 30000, 32000);
             int ret = p.waitFor();
             if (ret < 0) {
@@ -46,6 +47,7 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
+	    LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid, 32000, 34000);
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
 		pid, "image_p2", "config-p2", myip, 32000, 34000);
             int ret = p.waitFor();
@@ -85,10 +87,9 @@ public class PortManager
         try {
             OutputStream out = s.getOutputStream();
             InetAddress addr = s.getInetAddress();
-            String hostIP = addr.getHostAddress();
             int port = s.getPort();
-            int value = LibPort.INSTANCE.liblatte_check_access(hostIP, port, "alice:access");
-            System.err.println("recevie request from " + hostIP + ":" + port + "; attest val " + value);
+            int value = LibPort.INSTANCE.liblatte_check_access(myip, port, "alice:access");
+            System.err.println("recevie request from " + myip + ":" + port + "; attest val " + value);
             /// no access (0) -> return abnormally (1)
             // accessible (1) -> return normally (0)
             out.write(value == 0? 1: 0);
