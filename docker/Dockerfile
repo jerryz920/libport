@@ -23,9 +23,9 @@ RUN cd /opt && git clone https://github.com/jerryz920/utils utils && \
 	cd utils/library && bash install_lib.sh
 RUN cd /opt && git clone https://github.com/jerryz920/libport libport && \
 	cd libport/libport-core/src/main/native/ && LD_LIBRARY_PATH=/usr/local/lib/ bash build.sh && \
-	cd build.Release &&  make install
+	cd build.Release && make install && ln -s /usr/lib/liblatte.so /usr/lib/libport.so
 RUN cd /opt/libport && mvn install && \
-	mkdir -p /opt/java/ && cp dist/libport-java-0.1.0-with-dependencies.jar /opt/java
+	mkdir -p /opt/java/ && cp dist/libport-java-0.1.0-with-dependencies.jar /opt/java/libport.jar
 
 # continue setup Spark from here
 

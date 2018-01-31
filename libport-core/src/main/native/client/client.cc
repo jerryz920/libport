@@ -332,13 +332,14 @@ static std::string auth_ip;
 // clear stalled information (if any)
 int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path) {
   syscall_gate = latte::utils::make_unique<SyscallProxyImpl>();
-
+  std::string myip;
+  auth_ip = latte::utils::get_myip();
   if (run_as_iaas) {
     myid = IAAS_IDENTITY;
-    auth_ip = "must_provide_ip_in_creation_as_iaas";
+    myip = "must_provide_ip_in_creation_as_iaas";
     auth_speaker = myid;
   } else {
-    auth_ip = latte::utils::get_myip();
+    myip = auth_ip;
     int lo, hi;
     if (!myid || strcmp(myid, "") == 0) {
       if (syscall_gate->get_local_ports(&lo, &hi) < 0) {
@@ -357,9 +358,9 @@ int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path) {
     return -1;
   }
   if (!daemon_path || strcmp(daemon_path, "") == 0) {
-    latte_client = latte::utils::make_unique<latte::AttGuardClient>(auth_speaker, auth_ip);
+    latte_client = latte::utils::make_unique<latte::AttGuardClient>(auth_speaker, myip);
   } else {
-    latte_client = latte::utils::make_unique<latte::AttGuardClient>(auth_speaker, auth_ip, daemon_path);
+    latte_client = latte::utils::make_unique<latte::AttGuardClient>(auth_speaker, myip, daemon_path);
   }
 
   latte::log("liblatte core initialized for process %d\n", getpid());
