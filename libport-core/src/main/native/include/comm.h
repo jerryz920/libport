@@ -70,7 +70,9 @@ namespace latte {
       }
       uint32_t size, magic;
       google::protobuf::io::CodedInputStream::ReadLittleEndian32FromArray(buffer, &size);
-      google::protobuf::io::CodedInputStream::ReadLittleEndian32FromArray(buffer, &magic);
+      google::protobuf::io::CodedInputStream::ReadLittleEndian32FromArray(buffer
+          +sizeof(magic), &magic);
+      log("proto header expect size: %d, %x", size, magic);
 
       // +1 for defense
       utils::Buffer response_buf(size + 1);
@@ -78,7 +80,7 @@ namespace latte {
       if (ret != 0) {
         return ret;
       }
-      if (result->ParseFromArray(response_buf.buf(), size)) {
+      if (!result->ParseFromArray(response_buf.buf(), size)) {
         return utils::PARSE_ERROR;
       }
       return 0;

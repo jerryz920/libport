@@ -66,7 +66,7 @@ class AttGuardClient {
       p.set_id(uuid);
       auto auth = p.mutable_auth();
       auth->set_ip(ip);
-      auth->set_port_hi(lo);
+      auth->set_port_lo(lo);
       auth->set_port_hi(hi);
       auto code = p.mutable_code();
       code->set_image(image);
@@ -241,8 +241,29 @@ class AttGuardClient {
       auto auth = p->mutable_auth();
       auth->set_ip(ip);
       auth->set_port_lo(port);
-      auto resp = post(prepare<proto::Command::CHECK_ATTESTATION>(statement, myid_.c_str()));
-      return resp.extract_attestation();
+      auto resp = post(prepare<proto::Command::CHECK_ATTESTATION>(statement,
+            myid_.c_str()));
+
+      auto att = resp.extract_attestation();
+      if (!att) {
+        /// something might be wrong, try log it
+        auto status = resp.status();
+        log("%s, response = (%d, %s)",
+            proto::statement_traits<proto::Command::CHECK_ATTESTATION>::name,
+            status.first, status.second.c_str());
+      }
+      return att;
+    }
+
+    int check_worker_access(const std::string &ip, uint32_t port,
+        const std::string &object) {
+      proto::CheckAccess statement;
+      statement.add_objects(object);
+      auto p = statement.mutable_principal();
+      auto auth = p->mutable_auth();
+      auth->set_ip(ip);
+      auth->set_port_lo(port);
+      return quick_post<proto::Command::CHECK_WORKER_ACCESS>(statement);
     }
     ////
 
@@ -286,7 +307,7 @@ class AttGuardClient {
       ret = proto_recv_msg(sock_, result);
       if (ret != 0) {
         std::stringstream err;
-        err << "recv failure" << ret;
+        err << "recv failure " << ret;
         return proto::make_status_response(false, err.str());
       }
       return proto::ResponseWrapper(result);
@@ -355,6 +376,8 @@ int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path) {
 
 static int _create_principal_new(uint64_t uuid, const char *image, const char *config,
     const char *ip, uint32_t port_lo, uint32_t port_hi) {
+  latte::log("creating principal %llu, %s, %s, %d, %d, ip=%s\n", uuid, image, config,
+      port_lo, port_hi, ip);
   if (!ip || *ip == '\0') {
     return latte_client->create_principal(uuid, image, config, 
         latte_client->myip(), port_lo, port_hi);
@@ -371,7 +394,6 @@ int liblatte_create_principal_new(uint64_t uuid, const char *image, const char *
   // in Java. It will be included in misc config fields
   
   CHECK_LIB_INIT;
-  latte::log("creating principal %llu, %s, %s, %d, %s\n", uuid, image, config, nport, new_ip);
   /// allocate ports first (maybe assign new IP)
   int v = syscall_gate->alloc_child_ports(0, uuid, nport);
   if (v < 0) {
@@ -621,6 +643,14 @@ int liblatte_check_access(const char *ip, uint32_t port, const char *object) {
   CHECK_NULL_PTR(object);
   latte::log("check access: if %s:%u can access %s", ip, port, object);
   return latte_client->check_access(ip, port, object);
+}
+
+int liblatte_check_worker_access(const char *ip, uint32_t port, const char *object) {
+  CHECK_LIB_INIT;
+  CHECK_NULL_PTR(ip);
+  CHECK_NULL_PTR(object);
+  latte::log("check worker access: if %s:%u can access %s", ip, port, object);
+  return latte_client->check_worker_access(ip, port, object);
 }
 
 char* liblatte_check_attestation(const char *ip, uint32_t port, char **attestation,

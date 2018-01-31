@@ -4,3 +4,4 @@ run_as_iaas = false
 metadata_ip = 10.10.1.39
 metadata_port = 19851
 daemon_socket = vm1.sock
+log = debug

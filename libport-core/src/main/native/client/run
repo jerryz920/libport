@@ -1,12 +1,100 @@
+#!/bin/bash
 
 IAAS="152.3.145.38:444"
 ATTEST="152.3.145.138:4144"
 
-IP1="2.1.1.1"
+IP1="192.1.1.3"
+IP2="192.1.2.3"
 VM1="$IP1:1-65535"
+VM2="$IP2:1-65535"
 CTN1="$IP1:10000-20000"
+CTN2="$IP2:10000-20000"
 SPARKM="$IP1:10001-10010"
+SPARKS="$IP2:10001-10010"
 
-./latte $IAAS ../build/vm1.sock
+#int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path);
+#int liblatte_create_principal_new(uint64_t uuid, const char *image, const char *config,
+#    int nport, const char *new_ip);
+#int liblatte_create_principal(uint64_t uuid, const char *image, const char *config,
+#    int nport);
+#
+#int liblatte_create_principal_with_allocated_ports(uint64_t uuid, const char *image,
+#    const char *config, const char * ip, int port_lo, int port_hi);
+#/// Legacy API
+#int liblatte_post_object_acl(const char *obj_id, const char *requirement);
+#int liblatte_delete_principal_without_allocated_ports(uint64_t uuid);
+#
+#int liblatte_endorse_image(const char *id, const char *config, const char *property) ;
+#int liblatte_endorse_membership(const char *ip, uint32_t port, uint64_t gn, const char *master);
+#int liblatte_endorse_attester(const char *id, const char *config);
+#int liblatte_check_property(const char *ip, uint32_t port, const char *property);
+#int liblatte_check_access(const char *ip, uint32_t port, const char *object);
+#char* liblatte_check_attestation(const char *ip, uint32_t port, char **attestation,
+#    size_t *size);
+
+#endif
 
 
+./latte $IAAS ../build/vm1.sock <<EOF
+create  1 vmimg * $IP1 1 65535
+create  10 vmimg * $IP2 1 65535
+endorse_attester  vmimg *
+endorse_attester  containerimg *
+endorse_image  vmimg * git://docker
+endorse_image  containerimg * git://spark
+endorse_image  sparkimg * git://pio
+EOF
+
+./latte $VM1 ../build/vm1.sock <<EOF
+create 2 containerimg * $IP1 10000 20000
+EOF
+
+./latte $VM2 ../build/vm1.sock <<EOF
+create 20 containerimg * $IP2 10000 20000
+EOF
+
+./latte $CTN2 ../build/vm1.sock <<EOF
+create 30 sparkimg * $IP2 10001 10010
+EOF
+#
+./latte $CTN1 ../build/vm1.sock <<EOF
+create 3 sparkimg * $IP1 10001 10010
+endorse_member $IP2 10020 0 clusterct
+EOF
+
+./latte $SPARKM ../build/vm1.sock <<EOF
+endorse_member $IP2 10005 0 clustersp
+EOF
+#
+./latte alice ../build/vm1.sock <<EOF
+post_acl object_pio git://pio
+post_acl object_docker git://docker
+post_acl object_spark git://spark
+EOF
+#
+./latte $ATTEST ../build/vm1.sock <<EOF
+#attest $IP1 1
+#attest $IP1 10000
+#attest $IP1 10002
+#check_property $IP1 1 git://pio
+#check_property $IP1 1 git://spark
+#check_property $IP1 1 git://docker
+#check_access $IP1 1 alice:object_docker
+#check_property $IP1 10000 git://pio
+#check_property $IP1 10000 git://spark
+#check_property $IP1 10000 git://docker
+#check_property $IP1 10002 git://pio
+#check_property $IP1 10002 git://spark
+#check_property $IP1 10002 git://docker
+worker_access $IP2 10005 alice:object_pio
+#worker_access $IP2 10007 alice:object_pio
+worker_access $IP2 10005 alice:object_spark
+#worker_access $IP2 10007 alice:object_spark
+worker_access $IP2 10005 alice:object_docker
+#worker_access $IP2 10007 alice:object_docker
+#
+worker_access $IP2 10015 alice:object_pio
+worker_access $IP2 10017 alice:object_spark
+worker_access $IP2 10019 alice:object_docker
+EOF
+#

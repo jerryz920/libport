@@ -2,6 +2,7 @@
 #include "jutils/config/simple.h"
 #include "config.h"
 #include <sstream>
+#include "log.h"
 
 namespace latte {
 
@@ -11,6 +12,15 @@ ConfigItems config_cache_;
 
 void load_config(const char *path) {
   auto &conf = jutils::config::SimpleConfig::create_config(path);
+
+  const std::string *loglevel = conf.get(LOG_LEVEL);
+  if (*loglevel == "debug") {
+    printf("log setting to debug mode\n");
+    latte::setloglevel(LOG_DEBUG);
+  } else {
+    latte::setloglevel(LOG_INFO);
+  }
+
   const std::string *myid = conf.get(MY_ID);
   if (!myid) {
     throw std::runtime_error("myid not configured");

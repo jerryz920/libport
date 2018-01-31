@@ -18,6 +18,7 @@ const constexpr int PROTO_MAGIC = 0x1987;
 
 namespace config {
 
+constexpr const char *LOG_LEVEL = "log";
 constexpr const char *MY_ID = "speaker_id";
 constexpr const char *MY_IP = "speaker_ip";
 constexpr const char *RUN_AS_IAAS = "run_as_iaas";

@@ -273,7 +273,9 @@ void MetadataServiceClient::endorse_membership(const std::string &speaker,
     uint32_t port, uint64_t gn, const std::string &property, const std::string &config) {
   std::string identity;
   this->post_statement("/postWorkerSet", speaker, {property,
-      utils::format_netaddr(ip, port), utils::itoa(gn), config})
+      utils::format_netaddr(ip, port),
+      //utils::itoa(gn),
+      config})
     .then(debug_task())
     /*
     .then(json_task("endorsing membership"))

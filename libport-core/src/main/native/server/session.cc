@@ -1,5 +1,6 @@
 
 #include "session.h"
+#include <boost/asio.hpp>
 
 
 
@@ -7,16 +8,17 @@ namespace latte {
 Session::Session(io_service &service, std::shared_ptr<LatteDispatcher> dispatcher): 
   s_(service), dispatcher_(dispatcher) {
     sid_ = utils::gen_rand_uint64();
-    s_.non_blocking(true);
     log("session %u created", sid_);
   }
 
 
 bool Session::authenticate() {
   auto ids = utils::unix_auth_id(s_.native_handle());
+  s_.non_blocking(true);
   pid_ = std::get<0>(ids);
   uid_ = std::get<1>(ids);
   gid_ = std::get<2>(ids);
+  log("session authentication: %u %u %u", pid_, uid_, gid_);
   /// pid can't be 0
   if (pid_ == 0) {
     return false;
@@ -25,6 +27,7 @@ bool Session::authenticate() {
 }
 
 void Session::proto_start() {
+  log("session %u proto starts\n", sid_);
   async_read(s_, buffer(rcv_buf_, COMM_HEADER_SZ),
       std::bind(&Session::header_received, shared_from_this(),
         std::placeholders::_1, std::placeholders::_2));
@@ -85,24 +88,37 @@ void Session::command_received(const boost::system::error_code &ec, size_t len, 
   result->set_pid(pid_);
   result->set_uid(uid_);
   result->set_gid(gid_);
+  log("command received, auth %s, type %s", result->auth().c_str(),
+      result->Type_Name(result->type()).c_str());
   dispatcher_->dispatch(result, std::bind(&Session::write_response,
         shared_from_this(), std::placeholders::_1));
 }
 
+static inline void serialize_msg(const proto::Response &resp,
+    unsigned char *ptr) {
+  uint32_t sz = resp.ByteSize();
+  CodedOutputStream::WriteLittleEndian32ToArray(sz, ptr);
+  CodedOutputStream::WriteLittleEndian32ToArray(PROTO_MAGIC,
+      ptr + sizeof(uint32_t));
+  resp.SerializeToArray(ptr + COMM_HEADER_SZ, sz);
+}
+
 /// callback for dispatcher
 void Session::write_response(std::shared_ptr<proto::Response> resp) {
-  size_t sz = resp->ByteSize();
-  if (sz > SEND_BUFSZ) {
-    large_snd_buf_ = decltype(large_snd_buf_)(sz, 0);
-    async_write(s_, buffer(large_snd_buf_, sz),
+  size_t msgsz = resp->ByteSize() + COMM_HEADER_SZ;
+  log("response: %u bytes, result type %s", msgsz, 
+      resp->Type_Name(resp->type()).c_str());
+  if (msgsz > SEND_BUFSZ) {
+    large_snd_buf_ = decltype(large_snd_buf_)(msgsz, 0);
+    serialize_msg(*resp, &large_snd_buf_[0]);
+    async_write(s_, buffer(large_snd_buf_, msgsz),
         std::bind(&Session::response_sent, shared_from_this(),
           std::placeholders::_1, std::placeholders::_2));
-    resp->SerializeToArray(&large_snd_buf_[0], sz);
   } else {
-    async_write(s_, buffer(snd_buf_, sz),
+    serialize_msg(*resp, &snd_buf_[0]);
+    async_write(s_, buffer(snd_buf_, msgsz),
         std::bind(&Session::response_sent, shared_from_this(),
-          std::placeholders::_1, sz));
-    resp->SerializeToArray(&snd_buf_[0], sz);
+          std::placeholders::_1, msgsz));
   }
 }
 
