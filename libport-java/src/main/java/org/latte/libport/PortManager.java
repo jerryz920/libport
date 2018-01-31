@@ -171,6 +171,7 @@ public class PortManager
         System.err.println("after p2");
         if (args.length > 0) {
             System.err.println("args0: " + args[0]);
+        running = false;
             System.exit(0);
         }
         testAttester();
