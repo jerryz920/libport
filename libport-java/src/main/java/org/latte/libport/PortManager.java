@@ -25,12 +25,12 @@ public class PortManager
             f.setAccessible(true);
             pid1 = f.getInt(p);
 	    LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid1, 40500, 42000);
-            LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(pid1, "image_p1", "config-p1", myip, 30000, 32000);
+            LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(pid1, "image_p1", "*", myip, 40000, 42000);
             int ret = p.waitFor();
             if (ret < 0) {
                 System.err.println("expect P1 to exit normally");
             }
-           // LibPort.INSTANCE.liblatte_delete_principal(pid1);
+            LibPort.INSTANCE.liblatte_delete_principal(pid1);
         } catch (Throwable e) {
             throw new RuntimeException("can not get pid of P1");
         }
@@ -49,7 +49,7 @@ public class PortManager
             pid = f.getInt(p);
 	    System.err.println("syscall for p2? " + LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid, 42001, 43000));
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
-		pid, "image_p2", "config-p2", myip, 32001, 33000);
+		pid, "image_p2", "*", myip, 42001, 43000);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect P2 to exit abnormally");
@@ -71,7 +71,7 @@ public class PortManager
             f.setAccessible(true);
             pid = f.getInt(p);
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
-		pid, "image_attester", "config-attester", myip, 42000, 46000);
+		pid, "image_attester", "*", myip, 45000, 46000);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect Attester to exit abnormally");
@@ -160,6 +160,7 @@ public class PortManager
 	    "git://github.com/jerryz920/p1");
         LibPort.INSTANCE.liblatte_endorse_image("image_p1", "*", "access");
         LibPort.INSTANCE.liblatte_endorse_attester("image_p2", "*");
+        LibPort.INSTANCE.liblatte_endorse_attester("image_attester", "*");
         LibPort.INSTANCE.liblatte_endorse_image("image_p2", "*", 
 	    "git://github.com/jerryz920/p1");
         LibPort.INSTANCE.liblatte_post_object_acl("alice:access", "access");
