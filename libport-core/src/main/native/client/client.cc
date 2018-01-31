@@ -363,7 +363,8 @@ int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path) {
     latte_client = latte::utils::make_unique<latte::AttGuardClient>(auth_speaker, myip, daemon_path);
   }
 
-  latte::log("liblatte core initialized for process %d\n", getpid());
+  latte::log("liblatte core initialized for process %d, with id %s, ip: %s\n", getpid(),
+      auth_speaker.c_str(), myip.c_str());
   return 0;
 }
 
