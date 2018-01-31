@@ -88,7 +88,7 @@ public class PortManager
             OutputStream out = s.getOutputStream();
             InetAddress addr = s.getInetAddress();
             int port = s.getPort();
-            int value = LibPort.INSTANCE.liblatte_check_access(myip, port, "alice:access");
+            int value = LibPort.INSTANCE.liblatte_check_access(myip, port, "alice:object");
             System.err.println("recevie request from " + myip + ":" + port + "; attest val " + value);
             /// no access (0) -> return abnormally (1)
             // accessible (1) -> return normally (0)
@@ -175,7 +175,7 @@ public class PortManager
         LibPort.INSTANCE.liblatte_endorse_attester("image_attester", "*");
         LibPort.INSTANCE.liblatte_endorse_image("image_p2", "*", 
 	    "git://github.com/jerryz920/p1");
-        LibPort.INSTANCE.liblatte_post_object_acl("alice:access", "access");
+        LibPort.INSTANCE.liblatte_post_object_acl("alice:object", "access");
         System.err.println("after posting object acl");
 
         testP1();
