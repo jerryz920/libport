@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.io.IOException;
 import java.io.BufferedReader;
 import java.lang.reflect.Field;
+import java.util.concurrent.TimeUnit;
 
 public class Attester {
     public static final int abacPort = PortManager.abacPort;
@@ -17,11 +18,12 @@ public class Attester {
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid1 = f.getInt(p);
-            LibPort.INSTANCE.liblatte_create_principal(pid1, "image_p3", "config-p3", 20);
+            LibPort.INSTANCE.liblatte_create_principal(pid1, "image_p3", "*", 20);
             int ret = p.waitFor();
             if (ret < 0) {
                 System.err.println("expect P3 to exit normally");
             }
+	    LibPort.INSTANCE.liblatte_delete_principal(pid1);
         } catch (Throwable e) {
             throw new RuntimeException("can not get pid of P3");
         }
@@ -38,11 +40,12 @@ public class Attester {
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
-            LibPort.INSTANCE.liblatte_create_principal(pid, "image_p4", "config-p4", 20);
+            LibPort.INSTANCE.liblatte_create_principal(pid, "image_p4", "*", 20);
             int ret = p.waitFor();
             if (ret == 0) {
                 System.err.println("expect P4 to exit abnormally");
             }
+	    LibPort.INSTANCE.liblatte_delete_principal(pid);
         } catch (Throwable e) {
             throw new RuntimeException("can not get pid of P4");
         }
@@ -51,6 +54,11 @@ public class Attester {
     public static void main(String[] args)
     {
         int pid = LibC.INSTANCE.getpid();
+	try {
+	  TimeUnit.MILLISECONDS.sleep(100);
+	} catch (InterruptedException e) {
+
+	}
         Utils.reportLocalPorts("attester" + pid);
         System.err.println("initialize Attester");
         LibPort.INSTANCE.liblatte_init("", 0, "");
@@ -62,8 +70,8 @@ public class Attester {
         LibPort.INSTANCE.liblatte_endorse_image("image_p4", "*", 
 	    "git://github.com/jerryz920/p2");
         testP1();
-        System.err.println("after attester P1");
+        Utils.reportString("attester", "after attester P1");
         testP2();
-        System.err.println("after attester P2");
+        Utils.reportString("attester", "after attester P2");
     }
 }

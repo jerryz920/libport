@@ -30,6 +30,17 @@ public class Utils {
         }
     }
 
+    static void reportString(String fname, String val)
+    {
+        try {
+            PrintWriter p = new PrintWriter(new FileWriter(fname));
+            p.println("string :" + val);
+            p.close();
+        } catch (IOException e) {
+            System.err.println("IO exception " + e);
+        }
+    }
+
 
     public static void reportLocalPorts(String fname)
     {

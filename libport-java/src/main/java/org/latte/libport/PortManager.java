@@ -111,7 +111,7 @@ public class PortManager
             ServerSocket s = null;
             try {
                 s = new ServerSocket(abacPort);
-                s.setSoTimeout(100);
+                s.setSoTimeout(400);
             } catch (IOException e) {
                 System.err.println("error creating server socket: " + e);
                 System.exit(1);
