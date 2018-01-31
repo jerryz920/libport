@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.io.IOException;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.concurrent.TimeUnit;
 
 
 public class P1 {
@@ -11,6 +12,7 @@ public class P1 {
     public static void main(String []args)
     {
         int pid = LibC.INSTANCE.getpid();
+	TimeUnit.MILLISECONDS.sleep(100);
         Utils.reportLocalPorts("test-main" + pid);
         int value = 0;
         try {

@@ -3,5 +3,5 @@ speaker_ip = 1.1.1.1
 run_as_iaas = false
 metadata_ip = 10.10.1.39
 metadata_port = 19851
-daemon_socket = vm1.sock
+daemon_socket = /var/run/attguard.sock
 log = debug

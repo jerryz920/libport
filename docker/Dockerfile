@@ -26,6 +26,7 @@ RUN cd /opt && git clone https://github.com/jerryz920/libport libport && \
 	cd build.Release && make install && ln -s /usr/lib/liblatte.so /usr/lib/libport.so
 RUN cd /opt/libport && mvn install && \
 	mkdir -p /opt/java/ && cp dist/libport-java-0.1.0-with-dependencies.jar /opt/java/libport.jar
+COPY rerun.sh /opt
 
 # continue setup Spark from here
 
