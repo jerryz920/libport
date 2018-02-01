@@ -113,6 +113,7 @@ class SyscallProxy {
     virtual ~SyscallProxy() {}
     virtual int set_child_ports(pid_t pid, int lo, int hi) = 0;
     virtual int get_local_ports(int* lo, int *hi) = 0;
+    virtual int get_child_ports(pid_t pid, int* lo, int *hi) = 0;
     virtual int add_reserved_ports(int lo, int hi) = 0;
     virtual int del_reserved_ports(int lo, int hi) = 0;
     virtual int clear_reserved_ports() = 0;
@@ -154,6 +155,9 @@ class SyscallProxyImpl: public SyscallProxy {
     }
     int clear_reserved_ports() override {
       return ::clear_reserved_ports();
+    }
+    int get_child_ports(pid_t pid, int *lo, int *hi) override {
+      return ::get_child_ports(pid, lo, hi);
     }
     int alloc_child_ports(pid_t ppid, pid_t pid, int n) override {
       return ::alloc_child_ports(ppid, pid, n);

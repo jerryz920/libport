@@ -491,6 +491,9 @@ int liblatte_delete_principal_without_allocated_ports(uint64_t uuid) {
 
 
 int liblatte_delete_principal(uint64_t uuid) {
+  int lo, hi;
+  syscall_gate->get_child_ports(uuid, &lo, &hi);
+  syscall_gate->del_reserved_ports(lo, hi);
   return liblatte_delete_principal_without_allocated_ports(uuid);
 }
 
