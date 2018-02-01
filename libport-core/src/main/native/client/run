@@ -34,8 +34,9 @@ SPARKS="$IP2:10001-10010"
 
 #endif
 
+SOCK="/var/run/attguard.sock"
 
-./latte $IAAS ../build/vm1.sock <<EOF
+./latte $IAAS $SOCK <<EOF
 create  1 vmimg * $IP1 1 65535
 create  10 vmimg * $IP2 1 65535
 endorse_attester  vmimg *
@@ -45,34 +46,34 @@ endorse_image  containerimg * git://spark
 endorse_image  sparkimg * git://pio
 EOF
 
-./latte $VM1 ../build/vm1.sock <<EOF
+./latte $VM1 $SOCK <<EOF
 create 2 containerimg * $IP1 10000 20000
 EOF
 
-./latte $VM2 ../build/vm1.sock <<EOF
+./latte $VM2 $SOCK <<EOF
 create 20 containerimg * $IP2 10000 20000
 EOF
 
-./latte $CTN2 ../build/vm1.sock <<EOF
+./latte $CTN2 $SOCK <<EOF
 create 30 sparkimg * $IP2 10001 10010
 EOF
 #
-./latte $CTN1 ../build/vm1.sock <<EOF
+./latte $CTN1 $SOCK <<EOF
 create 3 sparkimg * $IP1 10001 10010
-endorse_member $IP2 10020 0 clusterct
+#endorse_member $IP2 10020 0 clusterct
 EOF
 
-./latte $SPARKM ../build/vm1.sock <<EOF
+./latte $SPARKM $SOCK <<EOF
 endorse_member $IP2 10005 0 clustersp
 EOF
 #
-./latte alice ../build/vm1.sock <<EOF
+./latte alice $SOCK <<EOF
 post_acl object_pio git://pio
-post_acl object_docker git://docker
-post_acl object_spark git://spark
+#post_acl object_docker git://docker
+#post_acl object_spark git://spark
 EOF
 #
-./latte $ATTEST ../build/vm1.sock <<EOF
+./latte $ATTEST $SOCK <<EOF
 #attest $IP1 1
 #attest $IP1 10000
 #attest $IP1 10002
@@ -88,13 +89,13 @@ EOF
 #check_property $IP1 10002 git://docker
 worker_access $IP2 10005 alice:object_pio
 #worker_access $IP2 10007 alice:object_pio
-worker_access $IP2 10005 alice:object_spark
+#worker_access $IP2 10005 alice:object_spark
 #worker_access $IP2 10007 alice:object_spark
-worker_access $IP2 10005 alice:object_docker
+#worker_access $IP2 10005 alice:object_docker
 #worker_access $IP2 10007 alice:object_docker
 #
-worker_access $IP2 10015 alice:object_pio
-worker_access $IP2 10017 alice:object_spark
-worker_access $IP2 10019 alice:object_docker
+#worker_access $IP2 10015 alice:object_pio
+#worker_access $IP2 10017 alice:object_spark
+#worker_access $IP2 10019 alice:object_docker
 EOF
 #

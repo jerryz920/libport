@@ -30,7 +30,7 @@ public class PortManager
             if (ret != 0) {
                 System.err.println("expect P1 to exit normally");
             }
-            //LibPort.INSTANCE.liblatte_delete_principal(pid1);
+            LibPort.INSTANCE.liblatte_delete_principal(pid1);
         } catch (Throwable e) {
             throw new RuntimeException("can not get pid of P1");
         }
@@ -77,6 +77,7 @@ public class PortManager
             if (ret != 0) {
                 System.err.println("expect Attester to exit normally");
             }
+	    LibPort.INSTANCE.liblatte_delete_principal(pid);
         } catch (Throwable e) {
             throw new RuntimeException("can not get pid of Attester");
         }

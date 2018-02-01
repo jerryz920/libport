@@ -304,7 +304,7 @@ void MetadataServiceClient::endorse_builder_on_source(const std::string &speaker
 void MetadataServiceClient::endorse_builder(const std::string &speaker,
     const std::string &image_id,
     const std::string &config) {
-  this->post_statement("/postBuilderImage", speaker, 
+  this->post_statement("/postBuilderImage", IAAS_IDENTITY, 
       {image_id, config})
     .then(debug_task())
     .then(sink_task("endorsing builder")).wait();
@@ -312,7 +312,7 @@ void MetadataServiceClient::endorse_builder(const std::string &speaker,
 void MetadataServiceClient::endorse_attester_on_source(const std::string &speaker,
     const std::string &source_id,
     const std::string &config) {
-  this->post_statement("/postAttesterSource", speaker, 
+  this->post_statement("/postAttesterSource", IAAS_IDENTITY, 
       {source_id, config})
     .then(debug_task())
     .then(sink_task("endorsing attester")).wait();
@@ -321,7 +321,7 @@ void MetadataServiceClient::endorse_attester_on_source(const std::string &speake
 void MetadataServiceClient::endorse_attester(const std::string &speaker,
     const std::string &image_id,
     const std::string &config) {
-  this->post_statement("/postAttesterImage", speaker, 
+  this->post_statement("/postAttesterImage", IAAS_IDENTITY, 
       {image_id, config})
     .then(debug_task())
     .then(sink_task("endorsing attester")).wait();
@@ -330,7 +330,7 @@ void MetadataServiceClient::endorse_attester(const std::string &speaker,
 void MetadataServiceClient::endorse_source(const std::string &speaker,
     const std::string &image_id,
     const std::string &config, const std::string &source) {
-  this->post_statement("/postImageSource", speaker, 
+  this->post_statement("/postImageSource", IAAS_IDENTITY, 
       {image_id, config, source})
     .then(debug_task())
     .then(sink_task("endorsing source")).wait();
