@@ -70,11 +70,12 @@ public class PortManager
             Field f = p.getClass().getDeclaredField("pid");
             f.setAccessible(true);
             pid = f.getInt(p);
+	    LibC.INSTANCE.syscall(LibC.SET_LOCAL_PORT, pid1, 45000, 46000);
             LibPort.INSTANCE.liblatte_create_principal_with_allocated_ports(
 		pid, "image_attester", "*", myip, 45000, 46000);
             int ret = p.waitFor();
-            if (ret == 0) {
-                System.err.println("expect Attester to exit abnormally");
+            if (ret != 0) {
+                System.err.println("expect Attester to exit normally");
             }
         } catch (Throwable e) {
             throw new RuntimeException("can not get pid of Attester");
