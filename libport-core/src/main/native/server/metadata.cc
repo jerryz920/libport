@@ -435,6 +435,29 @@ void MetadataServiceClient::remove_principal(
 }
 
 
+bool MetadataServiceClient::image_has_property(
+    const std::string &speaker,
+    const std::string &image,
+    const std::string &config,
+    const std::string &property) {
+  return this->post_statement("/checkImgProperty", ATTEST_IDENTITY, {
+      image, config, property})
+    .then(debug_task())
+    .then(json_task("check image property"))
+    .then([](pplx::task<web::json::value> v) -> bool {
+      try {
+        auto msg = v.get()["message"].as_string();
+        if (msg.find("hasSafetyProperty") == std::string::npos) {
+          log("image not having desired property: %s", msg.c_str());
+          return false;
+        }
+        return true;
+      } catch (std::runtime_error &e) {
+        /// we alreay caught it, no need to do again
+        return false;
+      }
+    }).get();
+}
 
 
 }

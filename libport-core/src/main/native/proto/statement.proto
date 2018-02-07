@@ -77,6 +77,12 @@ message CheckAccess {
 	repeated string objects = 2;
 }
 
+message CheckImage {
+        string image = 1;
+        map<string, string> config = 2;
+        repeated string property = 3;
+}
+
 message CheckAttestation {
   	Principal principal = 1;
 }
@@ -119,6 +125,7 @@ message Command {
 	  CHECK_ACCESS = 102;
 	  POST_ACL = 103;
 	  CHECK_WORKER_ACCESS = 104;
+	  CHECK_IMAGE_PROPERTY = 105;
 	}
 
 	Type type = 2;

@@ -132,6 +132,8 @@ class LatteAttestationManager: public LatteDispatcher {
           &LatteAttestationManager::check_access);
       register_handler(proto::Command::CHECK_WORKER_ACCESS, 
           &LatteAttestationManager::check_worker_access);
+      register_handler(proto::Command::CHECK_IMAGE_PROPERTY, 
+          &LatteAttestationManager::check_image_property);
     }
 
 
@@ -394,6 +396,20 @@ class LatteAttestationManager: public LatteDispatcher {
       auto &object = check->objects(0);
       return proto::make_shared_status_response(
           metadata_service_->can_worker_access(cmd->auth(),ip, port, object, ""), "");
+    }
+
+    std::shared_ptr<Response> check_image_property(std::shared_ptr<Command> cmd) {
+      auto check = proto::CommandWrapper::extract_check_image(*cmd);
+      auto &image = check->image();
+      auto &confmap = check->config();
+      if (check->property_size() == 0) {
+        return proto::make_shared_status_response(false, "must provide one property");
+      }
+      auto &config = confmap.at(LEGACY_CONFIG_KEY);
+      auto &property = check->property(0);
+      return proto::make_shared_status_response(
+          metadata_service_->image_has_property(cmd->auth(), image, config,
+            property), "");
     }
 
     void add_principal(uint64_t id, std::shared_ptr<proto::Principal> p) {

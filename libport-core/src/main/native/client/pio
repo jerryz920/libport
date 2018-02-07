@@ -3,14 +3,18 @@
 IAAS="152.3.145.38:444"
 ATTEST="152.3.145.138:4144"
 
-IP1="192.1.1.3"
-IP2="192.1.2.3"
+IP1="192.1.0.18"
+IP2="192.1.0.19"
+CTNIP1="192.1.3.0"
+CTNIP2="192.1.2.0"
 VM1="$IP1:1-65535"
 VM2="$IP2:1-65535"
-CTN1="$IP1:10000-20000"
-CTN2="$IP2:10000-20000"
-SPARKM="$IP1:10001-10010"
-SPARKS="$IP2:10001-10010"
+CTN1="$CTNIP1:1-65535"
+CTN2="$CTNIP2:1-65535"
+SPARKM="$CTNIP1:30000-65534"
+SPARKS="$CTNIP2:30000-65534"
+VMIMG="826ff6e8-d7d2-4a55-8c59-6ae9017b49be"
+CTNIMG="0f1469d4cf27"
 
 #int liblatte_init(const char *myid, int run_as_iaas, const char *daemon_path);
 #int liblatte_create_principal_new(uint64_t uuid, const char *image, const char *config,
@@ -37,38 +41,40 @@ SPARKS="$IP2:10001-10010"
 SOCK="/var/run/attguard.sock"
 
 ./latte $IAAS $SOCK <<EOF
-create  1 vmimg * $IP1 1 65535
-create  10 vmimg * $IP2 1 65535
-endorse_attester  vmimg *
-endorse_attester  containerimg *
-endorse_image  vmimg * git://docker
-endorse_image  containerimg * git://spark
-endorse_image  sparkimg * git://pio
+create  1 $VMIMG * $IP1 1 65535
+create  10 $VMIMG * $IP2 1 65535
+endorse_attester  $VMIMG *
+endorse_attester  $CTNIMG *
+endorse_image  $VMIMG * git://docker
+endorse_image  $CTNIMG * git://spark
+#endorse_image  sparkimg * pio
+#create 2 $CTNIMG * $CTNIP1 1 65535
+#create 20 $CTNIMG * $CTNIP2 1 65535
 EOF
 
 ./latte $VM1 $SOCK <<EOF
-create 2 containerimg * $IP1 10000 20000
+create 2 $CTNIMG * $CTNIP1 1 65535
 EOF
 
 ./latte $VM2 $SOCK <<EOF
-create 20 containerimg * $IP2 10000 20000
+create 20 $CTNIMG * $CTNIP2 1 65535
 EOF
 
 ./latte $CTN2 $SOCK <<EOF
-create 30 sparkimg * $IP2 10001 10010
+create 30 sparkimg * $CTNIP2 30000 65534
 EOF
 #
 ./latte $CTN1 $SOCK <<EOF
-create 3 sparkimg * $IP1 10001 10010
-#endorse_member $IP2 10020 0 clusterct
+create 3 sparkimg * $CTNIP1 30000 65534
 EOF
 
-./latte $SPARKM $SOCK <<EOF
-endorse_member $IP2 10005 0 clustersp
+./latte $CTN1 $SOCK <<EOF
+endorse_member $CTNIP2 10005 0 clustersp
 EOF
 #
 ./latte alice $SOCK <<EOF
-post_acl object_pio git://pio
+post_acl pio-obj1 pio
+#post_acl object_pio git://pio
 #post_acl object_docker git://docker
 #post_acl object_spark git://spark
 EOF
@@ -97,6 +103,7 @@ EOF
 #worker_access $IP2 10015 alice:object_pio
 #worker_access $IP2 10017 alice:object_spark
 #worker_access $IP2 10019 alice:object_docker
-check_image_property vmimg * git://docker
+#check_image_property vmimg * git://docker
+check_access $CTNIP2 50000 alice:pio-obj1
 EOF
 #

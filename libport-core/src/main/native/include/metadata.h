@@ -133,6 +133,9 @@ class MetadataServiceClient {
     virtual bool can_worker_access(const std::string &speaker,
         const std::string &ip, uint32_t port,
         const std::string &object, const std::string &bearer);
+    virtual bool image_has_property(const std::string &speaker,
+        const std::string &image, const std::string &config,
+        const std::string &prop);
 
     const std::string& myid() const { return myid_; }
 

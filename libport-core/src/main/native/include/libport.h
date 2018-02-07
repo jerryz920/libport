@@ -116,6 +116,7 @@ int liblatte_check_property(const char *ip, uint32_t port, const char *property)
 
 int liblatte_check_access(const char *ip, uint32_t port, const char *object);
 int liblatte_check_worker_access(const char *ip, uint32_t port, const char *object);
+int liblatte_check_image_property(const char *image, const char *config, const char *property);
 
 char* liblatte_check_attestation(const char *ip, uint32_t port, char **attestation,
     size_t *size);

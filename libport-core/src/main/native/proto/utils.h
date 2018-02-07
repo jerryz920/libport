@@ -238,6 +238,15 @@ class CommandWrapper {
       return result;
     }
 
+    static inline std::shared_ptr<CheckImage> extract_check_image(const Command &cmd) {
+      auto result = std::make_shared<CheckImage>();
+      auto stmt = cmd.statement();
+      if (!stmt.UnpackTo(result.get())) {
+          return nullptr;
+      }
+      return result;
+    }
+
     std::shared_ptr<Principal> extract_principal() {
       return extract_principal(*cmd_);
     }

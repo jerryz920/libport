@@ -266,6 +266,16 @@ class AttGuardClient {
       return quick_post<proto::Command::CHECK_WORKER_ACCESS>(statement);
     }
     ////
+    //
+    int check_image_property(const std::string &image, const std::string &config,
+        const std::string &property) {
+      proto::CheckImage statement;
+      statement.add_property(property);
+      auto& confmap = *statement.mutable_config();
+      confmap[LEGACY_CONFIG_KEY] = config;
+      statement.set_image(image);
+      return quick_post<proto::Command::CHECK_IMAGE_PROPERTY>(statement);
+    }
 
   private:
 
@@ -704,4 +714,10 @@ int liblatte_authip(char *ip, int max_len) {
   }
   strncpy(ip, auth_ip.c_str(), sz);
   return 0;
+}
+
+int liblatte_check_image_property(const char *image, const char *config,
+    const char *property) {
+  latte::log("check image property: %s, %s, %s", image, config, property);
+  return latte_client->check_image_property(image, config, property);
 }

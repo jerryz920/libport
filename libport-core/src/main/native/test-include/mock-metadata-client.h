@@ -53,6 +53,12 @@ class MockMetadataClient: public MetadataServiceClient {
         const std::string&, access_object, 
         const std::string&, bearer, override)
 
+    MOCK_METHOD4(bool, image_has_property,
+        const std::string&, speaker,
+        const std::string&, image,
+        const std::string&, config,
+        const std::string&, property, override)
+
     MOCK_VOID_METHOD3(endorse_attester,
         const std::string&, speaker,
         const std::string&, image_id,

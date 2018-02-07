@@ -49,6 +49,8 @@ def hasaccess(fn, args):
 def worker_access(fn, args):
     print(fn(cstr(args[0]), int(args[1]), cstr(args[2])))
 
+def image_has_property(fn, args):
+    print(fn(cstr(args[0]), cstr(args[1]), cstr(args[2])))
 
 
 
@@ -68,7 +70,8 @@ dispatch_table = {
         "check_access": [hasaccess, "check_access"],
         "check_property": [hasprop, "check_property"],
         "post_acl": [post_acl, "post_object_acl"],
-        "worker_access": [worker_access, "check_worker_access"]
+        "worker_access": [worker_access, "check_worker_access"],
+        "check_image_property": [image_has_property, "check_image_property"]
 }
 
 
