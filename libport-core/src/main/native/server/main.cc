@@ -6,12 +6,11 @@
 #include "jutils/fs.h"
 
 int main(int argc, char **argv) {
-  const char *config = "config.txt";
+  const char *config = "/etc/attguard/config.txt";
   if (argc > 1) {
     config = argv[1];
   }
   latte::config::load_config(config);
-
 
   auto url = latte::config::metadata_service_url();
   latte::init_manager(url);
