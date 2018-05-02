@@ -92,6 +92,20 @@ message PostACL {
         repeated string policies = 2;
 }
 
+message FreeCall {
+  	string cmd = 1;
+	// principal is set
+	repeated string otherValues = 2;
+}
+
+message GuardCall {
+  	string cmd = 1;
+	// principal is set
+	string ip = 2;
+	uint32 port = 3;
+	repeated string otherValues = 4;
+}
+
 
 message Command {
 
@@ -105,6 +119,8 @@ message Command {
 	  ENDORSE = 4;
 	  REVOKE = 5;
 	  GET_PRINCIPAL = 6;
+	  FREE_CALL = 7;
+	  GUARD_CALL = 8;
 	  ///
 
 	  GET_LOCAL_PRINCIPAL = 20;
