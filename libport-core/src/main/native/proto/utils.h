@@ -247,6 +247,33 @@ class CommandWrapper {
       return result;
     }
 
+    static inline std::shared_ptr<FreeCall> extract_free_call(const Command &cmd) {
+      auto result = std::make_shared<FreeCall>();
+      auto stmt = cmd.statement();
+      if (!stmt.UnpackTo(result.get())) {
+        return nullptr;
+      }
+      return result;
+    }
+
+    static inline std::shared_ptr<GuardCall> extract_guard_call(const Command &cmd) {
+      auto result = std::make_shared<GuardCall>();
+      auto stmt = cmd.statement();
+      if (!stmt.UnpackTo(result.get())) {
+        return nullptr;
+      }
+      return result;
+    }
+
+    static inline std::shared_ptr<LinkImage> extract_link_image(const Command &cmd) {
+      auto result = std::make_shared<LinkImage>();
+      auto stmt = cmd.statement();
+      if (!stmt.UnpackTo(result.get())) {
+        return nullptr;
+      }
+      return result;
+    }
+
     std::shared_ptr<Principal> extract_principal() {
       return extract_principal(*cmd_);
     }

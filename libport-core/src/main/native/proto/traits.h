@@ -44,6 +44,9 @@ DECL_STMT_TRAITS(Command::CHECK_ACCESS, CheckAccess, Status);
 DECL_STMT_TRAITS(Command::CHECK_ATTESTATION, CheckAttestation, Attestation);
 DECL_STMT_TRAITS(Command::CHECK_WORKER_ACCESS, CheckAccess, Status);
 DECL_STMT_TRAITS(Command::CHECK_IMAGE_PROPERTY, CheckImage, Status);
+DECL_STMT_TRAITS(Command::FREE_CALL, FreeCall, Status);
+DECL_STMT_TRAITS(Command::GUARD_CALL, GuardCall, Status);
+DECL_STMT_TRAITS(Command::LINK_IMAGE, LinkImage, Status);
 
 
 /* Over complicated

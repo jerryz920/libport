@@ -139,6 +139,24 @@ class MetadataServiceClient {
 
     const std::string& myid() const { return myid_; }
 
+
+    //// Remove those legacy calls
+    virtual bool create_instance(const std::string &speaker,
+        const std::string &pid, const std::string &image, const std::string &ip,
+        uint32_t lo, uint32_t hi, const std::string &image_store,
+        const std::unordered_map<std::string, std::string> &configs);
+    virtual bool delete_instance(const std::string &speaker,
+        const std::string &pid);
+    virtual bool free_call(const std::string &speaker, const std::string &cmd,
+        const std::vector<std::string> &otherargs);
+    virtual bool guard_call(const std::string &speaker, const std::string &cmd,
+        const std::vector<std::string> &otherargs);
+    virtual bool link_image(const std::string &speaker, const std::string &host,
+        const std::string &image);
+    virtual bool endorse(const std::string &speaker, const std::string &target,
+        const std::string &p, const std::string &v);
+
+
   private:
     pplx::task<web::http::http_response> post_statement(
         const std::string& api_path,
