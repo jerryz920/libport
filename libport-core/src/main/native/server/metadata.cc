@@ -48,7 +48,8 @@ namespace {
         const std::vector<std::string>& statements, const std::string& bearer) {
     web::json::value result = web::json::value::object(true);
     web::json::value otherValues = web::json::value::array();
-    for (size_t i = 0; i < statements.size(); i++) { otherValues[i] = web::json::value::string(statements[i]);
+    for (size_t i = 0; i < statements.size(); i++) {
+      otherValues[i] = web::json::value::string(statements[i]);
     }
     result["principal"] = web::json::value::string(speaker);
     result["otherValues"] = otherValues;
@@ -460,7 +461,110 @@ bool MetadataServiceClient::image_has_property(
 }
 
 
+
+bool MetadataServiceClient::create_instance(const std::string &speaker,
+        const std::string &pid, const std::string &image,
+        const std::string &ip, uint32_t lo, uint32_t hi,
+        const std::string &image_store,
+        const std::unordered_map<std::string, std::string> &configs) {
+
+  /// Create instance first 
+  this->post_statement("/postInstance", speaker,
+      {pid, image, utils::format_id(ip, lo, hi), image_store})
+    .then(debug_task())
+    .then(json_task("creating instance new"))
+    .then([&](pplx::task<web::json::value> v) -> pplx::task<web::http::http_response> {
+        try {
+          auto key = extract_safe_identity(v.get());
+          std::vector<std::string> statements;
+          statements.reserve(configs.size() + 1);
+          statements.push_back(pid);
+          for (auto &i: configs) {
+            statements.push_back(i.first);
+            statements.push_back(i.second);
+          }
+          return this->post_statement("/postInstanceConfig", speaker,
+              std::move(statements));
+        } catch(std::runtime_error &e) {
+          return pplx::task_from_exception<web::http::http_response>(
+            std::runtime_error(std::move(e)));
+        }
+    }).then(sink_task("posting configs")).wait();
+  return true;
 }
+
+bool MetadataServiceClient::delete_instance(const std::string &speaker,
+    const std::string &pid) {
+  this->post_statement("/lazyDelInstance", speaker, {pid})
+    .then(debug_task())
+    .then(json_task("creating instance new")).wait();
+  return true;
+}
+
+bool MetadataServiceClient::free_call(const std::string &speaker,
+    const std::string &cmd, const std::vector<std::string> &othervalues) {
+
+  std::string url;
+  if (cmd[0] == '/') {
+    url = cmd;
+  } else {
+    url = "/" + cmd;
+  }
+  this->post_statement(url, speaker, othervalues)
+    .then(debug_task())
+    .then(json_task(url.c_str())).wait();
+  return true;
+}
+
+bool MetadataServiceClient::guard_call(const std::string &speaker,
+    const std::string &cmd, const std::vector<std::string> &othervalues) {
+
+  std::string url;
+  if (cmd[0] == '/') {
+    url = cmd;
+  } else {
+    url = "/" + cmd;
+  }
+  return this->post_statement(url, speaker, othervalues)
+    .then(debug_task())
+    .then(json_task(url.c_str()))
+    .then([](pplx::task<web::json::value> v) -> bool {
+      try {
+        auto msg = v.get()["message"].as_string();
+        if (msg.find("Exception") == std::string::npos) {
+          log("approved check call: %s", msg.c_str());
+          return true;
+        }
+        log("denied check call: %s", msg.c_str());
+        return false;
+      } catch (std::runtime_error &e) {
+        /// we alreay caught it, no need to do again
+        return false;
+      }
+    }).get();
+
+}
+
+bool MetadataServiceClient::link_image(const std::string &speaker,
+    const std::string &host, const std::string &image) {
+  this->post_statement("/postLinkImageOwner", speaker, {host, image})
+    .then(debug_task())
+    .then(json_task("New Endorsements")).wait();
+  return true;
+}
+
+bool MetadataServiceClient::endorse(const std::string &speaker,
+    const std::string &target, const std::string &prop,
+    const std::string &val) {
+  this->post_statement("/postEndorsement", speaker, {target, prop, val})
+    .then(debug_task())
+    .then(json_task("New Endorsements")).wait();
+  return true;
+}
+
+
+}
+
 
 
 

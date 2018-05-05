@@ -32,7 +32,7 @@ constexpr const char *DAEMON_SOCKET_DEFAULT_PATH = "/var/run/latte/guard.sock";
 
 
 struct ConfigItems {
-  std::string myid;
+  std::string myid; /// This must be set to the VM instance ID
   std::string myip;
   std::string metadata_url;
   std::string metadata_ip;

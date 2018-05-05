@@ -62,17 +62,34 @@ class AttGuardClient {
     int create_principal(uint64_t uuid, const std::string &image,
         const std::string &config, const std::string &ip, uint32_t lo,
         uint32_t hi) {
+      std::stringstream ss;
+      ss << LEGACY_CONFIG_KEY << "=" << config;
+      return create_instance(uuid, image, {ss.str()}, ip, lo, hi, "");
+    }
+
+    int create_instance(uint64_t pid, const std::string &image,
+        const std::vector<std::string> &raw_configs, const std::string &ip,
+        uint32_t lport, uint32_t rport, const std::string &storage) {
       proto::Principal p;
-      p.set_id(uuid);
+      p.set_id(pid);
       auto auth = p.mutable_auth();
-      auth->set_ip(ip);
-      auth->set_port_lo(lo);
-      auth->set_port_hi(hi);
+      if (ip.size() == 0) { 
+        auth->set_ip(myip_);
+      } else{
+        auth->set_ip(ip);
+      }
+      auth->set_port_lo(lport);
+      auth->set_port_hi(rport);
       auto code = p.mutable_code();
       code->set_image(image);
-      code->set_wildcard(config == "*");
+      code->set_image_store(storage);
       auto& confmap = *code->mutable_config();
-      confmap[LEGACY_CONFIG_KEY] = config;
+      for (const auto s: raw_configs) {
+        auto split = s.find("=");
+        std::string key(s.begin(), s.begin() + split);
+        std::string val(s.begin() + split + 1, s.end());
+        confmap[std::move(key)] = std::move(val);
+      }
       return quick_post<proto::Command::CREATE_PRINCIPAL>(p);
     }
 
@@ -80,6 +97,22 @@ class AttGuardClient {
       proto::Principal p;
       p.set_id(uuid);
       return quick_post<proto::Command::DELETE_PRINCIPAL>(p);
+    }
+
+    int endorse(const std::string &id, const std::string &prop, const std::string &val) {
+      proto::Endorse statement;
+      statement.set_id(id);
+      auto fact = statement.add_endorsements();
+      fact->set_property(prop);
+      fact->set_value(val);
+      return quick_post<proto::Command::ENDORSE>(statement);
+    }
+
+    int link_image(const std::string &host, const std::string image) {
+      proto::LinkImage link;
+      link.set_host(host);
+      link.set_image(image);
+      return quick_post<proto::Command::LINK_IMAGE>(link);
     }
 
     std::unique_ptr<proto::Principal> get_principal(const std::string &ip, uint32_t lo) {
@@ -275,6 +308,27 @@ class AttGuardClient {
       confmap[LEGACY_CONFIG_KEY] = config;
       statement.set_image(image);
       return quick_post<proto::Command::CHECK_IMAGE_PROPERTY>(statement);
+    }
+
+    /////////// New interfaces
+
+    int free_call(const std::string &cmd, const std::vector<std::string> &values) {
+
+      proto::FreeCall statement;
+      statement.set_cmd(cmd);
+      for (auto value: values) {
+        statement.add_othervalues(value);
+      }
+      return quick_post<proto::Command::FREE_CALL>(statement);
+    }
+
+    int guard_call(const std::string &cmd, const std::vector<std::string> &values) {
+      proto::GuardCall statement;
+      statement.set_cmd(cmd);
+      for (auto value: values) {
+        statement.add_othervalues(value);
+      }
+      return quick_post<proto::Command::GUARD_CALL>(statement);
     }
 
   private:
@@ -501,9 +555,13 @@ int liblatte_delete_principal_without_allocated_ports(uint64_t uuid) {
 
 
 int liblatte_delete_principal(uint64_t uuid) {
-  int lo, hi;
-  syscall_gate->get_child_ports(uuid, &lo, &hi);
-  syscall_gate->del_reserved_ports(lo, hi);
+  int lo = 1, hi = 65535;
+  if (syscall_gate->get_child_ports(uuid, &lo, &hi) < 0) {
+    latte::log_err("fail to remove allocated ports");
+  }
+  if (lo > 1 && hi < 65535) {
+    syscall_gate->del_reserved_ports(lo, hi);
+  }
   return liblatte_delete_principal_without_allocated_ports(uuid);
 }
 
@@ -721,3 +779,83 @@ int liblatte_check_image_property(const char *image, const char *config,
   latte::log("check image property: %s, %s, %s", image, config, property);
   return latte_client->check_image_property(image, config, property);
 }
+
+
+int liblatte_create_instance(uint64_t pid, const char *image, const char *ip,
+    int nport, const char *store, const char **args, int n) {
+  if (nport <= 0 && (ip == NULL || strlen(ip) == 0)) {
+    latte::log_err("must provide at least ip or nport");
+    return -1;
+  }
+  /// We are OK with empty IP, let the guard daemon decides
+  if (!ip) {
+    ip = "";
+  }
+  /// if nport is requested, do it whatever
+  int lport, rport;
+  if (nport > 0) {
+    lport = syscall_gate->alloc_child_ports(getpid(), pid, nport);
+    if (lport < 0) {
+      latte::log_err("error in allocating the children ports");
+      return -1;
+    }
+    rport = lport + nport - 1;
+  } else {
+    lport = 1;
+    rport = 65535;
+  }
+  std::vector<std::string> nargs;
+  for (int i = 0; i < n; i++) {
+    nargs.emplace_back(args[i]);
+  }
+  if (!store) store = "";
+  return latte_client->create_instance(pid, image, nargs, ip, lport, rport, store);
+}
+
+int liblatte_delete_instance(uint64_t pid) {
+  return liblatte_delete_principal(pid);
+}
+
+int liblatte_endorse(const char *id, const char *prop, const char *val) {
+  latte::log("endorse: %s %s %s", id, prop, val);
+  if (!id || !prop || !val) {
+    latte::log_err("endorse value can't be null %p %p %p", id, prop, val);
+    return -1;
+  }
+  return latte_client->endorse(id, prop, val);
+}
+
+int liblatte_link_image(const char *host, const char *image) {
+  if (!host) host = "";
+  if (!image) image = "";
+  latte::log("link image: %s %s", host, image);
+  return latte_client->link_image(host, image);
+}
+
+
+int liblatte_free_call(const char *cmd, const char **args, int n) {
+  latte::log("free call: %s", cmd);
+  std::vector<std::string> nargs;
+  nargs.reserve(n);
+  for (int i = 0; i < n; i++) {
+    nargs.emplace_back(args[i]);
+  }
+  return latte_client->free_call(cmd, nargs);
+}
+
+int liblatte_guard_call(const char *cmd, const char *ip,
+    int port, const char **args, int n) {
+
+  latte::log("guard call: %s, %s, %d", cmd, ip, port);
+  std::vector<std::string> nargs;
+  nargs.reserve(n + 1);
+  std::stringstream ss;
+  ss << ip << ":" << port;
+  nargs.emplace_back(ss.str());
+  for (int i = 0; i < n; i++) {
+    nargs.emplace_back(args[i]);
+  }
+  return latte_client->guard_call(cmd, nargs);
+}
+
+

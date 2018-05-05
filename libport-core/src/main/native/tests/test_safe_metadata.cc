@@ -60,7 +60,6 @@ int main(int argc, char **argv) {
   bob.post_object_acl(idb, "cindy:objectx", "happy");
   assert(p2.can_access(id1, "192.168.0.2", 1050, "bob:objectx", b3));
   assert(p2.can_access(id1, "192.168.0.2", 1050, "cindy:objectx", b3));
-  auto idc = "cindy";
   latte::MetadataServiceClient cindy(addr, "cindy");
   bob.post_object_acl(idb, "objecty", "happy");
   assert(p2.can_access(id1, "192.168.0.2", 1050, "objecty", b3));

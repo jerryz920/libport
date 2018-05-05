@@ -134,6 +134,12 @@ class LatteAttestationManager: public LatteDispatcher {
           &LatteAttestationManager::check_worker_access);
       register_handler(proto::Command::CHECK_IMAGE_PROPERTY, 
           &LatteAttestationManager::check_image_property);
+      register_handler(proto::Command::FREE_CALL,
+          &LatteAttestationManager::free_call);
+      register_handler(proto::Command::GUARD_CALL,
+          &LatteAttestationManager::guard_call);
+      register_handler(proto::Command::LINK_IMAGE,
+          &LatteAttestationManager::link_image);
     }
 
 
@@ -144,6 +150,35 @@ class LatteAttestationManager: public LatteDispatcher {
     }
 
 
+    std::shared_ptr<Response> free_call(std::shared_ptr<Command> cmd) {
+      auto freecall = proto::CommandWrapper::extract_free_call(*cmd);
+      auto proto_values = freecall->othervalues();
+      std::vector<std::string> other_values(proto_values.begin(), proto_values.end());
+      auto res = metadata_service_->free_call(cmd->auth(),
+          freecall->cmd(), other_values);
+      return proto::make_shared_status_response(res, "");
+    }
+    std::shared_ptr<Response> guard_call(std::shared_ptr<Command> cmd) {
+      auto guardcall = proto::CommandWrapper::extract_guard_call(*cmd);
+      auto proto_values = guardcall->othervalues();
+      std::vector<std::string> other_values(proto_values.begin(), proto_values.end());
+      auto res = metadata_service_->guard_call(cmd->auth(),
+          guardcall->cmd(), other_values);
+      return proto::make_shared_status_response(res, "");
+    }
+
+    std::shared_ptr<Response> link_image(std::shared_ptr<Command> cmd) {
+      auto linkimage = proto::CommandWrapper::extract_link_image(*cmd);
+      auto host = linkimage->host();
+      if (host.size() == 0) {
+        host = cmd->auth();
+      }
+      auto &image = linkimage->image();
+      auto res = metadata_service_->link_image(cmd->auth(), host, image);
+      return proto::make_shared_status_response(res, "");
+    }
+
+
     std::shared_ptr<Response> create_principal(std::shared_ptr<Command> cmd) {
       auto p = proto::CommandWrapper::extract_principal(*cmd);
       if (!p) {
@@ -151,14 +186,25 @@ class LatteAttestationManager: public LatteDispatcher {
               "principal not found or mal-formed");
       }
       p->set_gn(gn());
+      auto image_store = p->code().image_store();
+      if (image_store.size() == 0) {
+        image_store = cmd->auth();
+      }
+      //auto res = metadata_service_->post_new_principal(cmd->auth(), principal_name(*p),
+      //    ip, p->auth().port_lo(), p->auth().port_hi(),
+      //    p->code().image(), p->code().config().at(LEGACY_CONFIG_KEY));
+      auto &confmap = p->code().config();
+      /// copy the stuff to make the interface clean from any protobuf dependency
+      std::unordered_map<std::string, std::string> configs(confmap.begin(), confmap.end());
+      metadata_service_ -> create_instance(cmd->auth(), principal_name(*p),
+          p->code().image(), p->auth().ip(), p->auth().port_lo(), p->auth().port_hi(),
+          image_store, configs);
 
-      auto res = metadata_service_->post_new_principal(cmd->auth(), principal_name(*p),
-          p->auth().ip(), p->auth().port_lo(), p->auth().port_hi(),
-          p->code().image(), p->code().config().at(LEGACY_CONFIG_KEY));
       p->set_speaker(cmd->pid());
       add_principal(p->id(), p);
       return proto::make_shared_status_response(true, "");
     }
+
 
     std::shared_ptr<Response> delete_principal(std::shared_ptr<Command> cmd) {
       auto p = proto::CommandWrapper::extract_principal(*cmd);
@@ -197,15 +243,16 @@ class LatteAttestationManager: public LatteDispatcher {
         auto speaker = latest->speaker();
         auto name = principal_name(*latest);
         auto ip = latest->auth().ip();
-        auto plo = latest->auth().port_lo();
-        auto phi = latest->auth().port_hi();
+        //auto plo = latest->auth().port_lo();
+        //auto phi = latest->auth().port_hi();
         auto image = latest->code().image();
         auto config = latest->code().config().at(LEGACY_CONFIG_KEY);
         log("deleting principal: id = %u, maxgn = %u, latest = %p, speaker = %u, pid = %u, uid = %u",
             p->id(), maxgn, latest.get(), speaker, cmd->pid(), cmd->uid());
 
         plock_.unlock();
-        metadata_service_->remove_principal(cmd->auth(),name, ip, plo, phi, image, config);
+        metadata_service_->delete_instance(cmd->auth(), name);
+        //metadata_service_->remove_principal(cmd->auth(),name, ip, plo, phi, image, config);
         return proto::make_shared_status_response(true, "");
       } else {
         plock_.unlock();
@@ -233,17 +280,15 @@ class LatteAttestationManager: public LatteDispatcher {
 
     std::shared_ptr<Response> endorse(std::shared_ptr<Command> cmd) {
       auto endorse = proto::CommandWrapper::extract_endorse(*cmd);
-      if (endorse->type() == proto::Endorse::SOURCE) {
-        return proto::not_implemented();
-      }
       if (endorse->endorsements_size() == 0) {
         return proto::make_shared_status_response(false,
             "must provide at least one property");
       }
       auto &image = endorse->id();
       auto &property = endorse->endorsements(0).property();
-      auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
-      metadata_service_->endorse_image(cmd->auth(),image, property, config);
+      auto &value = endorse->endorsements(0).value();
+      //auto &config = endorse->config().at(LEGACY_CONFIG_KEY);
+      metadata_service_->endorse(cmd->auth(), image, property, value);
       return proto::make_shared_status_response(true, "");
     }
 

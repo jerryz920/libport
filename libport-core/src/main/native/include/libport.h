@@ -121,7 +121,17 @@ int liblatte_check_image_property(const char *image, const char *config, const c
 char* liblatte_check_attestation(const char *ip, uint32_t port, char **attestation,
     size_t *size);
 
+int liblatte_create_instance(uint64_t pid, const char *image, const char *ip,
+    int nport, const char *store, const char **args, int n) ;
 
+int liblatte_delete_instance(uint64_t pid);
+int liblatte_endorse(const char *id, const char *p, const char *v);
+int liblatte_link_image(const char *creator, const char *image); /// Image storage calls the metadata service for so.
+
+int liblatte_free_call(const char *cmd, const char *arg1, const char *arg2, const char *arg3,
+    const char *arg4);
+
+int liblatte_guard_call(const char *cmd, const char *ip, int port, const char *arg1, const char *arg2, const char *arg3, const char *arg4);
 
 #ifdef __cplusplus
 }

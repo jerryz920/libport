@@ -17,6 +17,7 @@ message CodeID {
   	string image = 1;
 	map<string, string> config = 2;
 	bool wildcard = 3; // config is wildcarded
+	string image_store = 4; // where image is stored
 }
 
 message Endorsement {
@@ -29,6 +30,12 @@ message Endorsement {
 	}
 	Type type = 1;
   	string property = 2;
+	string value = 3;
+}
+
+message LinkImage {
+  string host = 1;
+  string image = 2;
 }
 
 /// Both create, delete, get principal expect to extract
@@ -92,6 +99,20 @@ message PostACL {
         repeated string policies = 2;
 }
 
+message FreeCall {
+  	string cmd = 1;
+	// principal is set
+	repeated string otherValues = 2;
+}
+
+message GuardCall {
+  	string cmd = 1;
+	// principal is set
+	string ip = 2;
+	uint32 port = 3;
+	repeated string otherValues = 4;
+}
+
 
 message Command {
 
@@ -105,6 +126,9 @@ message Command {
 	  ENDORSE = 4;
 	  REVOKE = 5;
 	  GET_PRINCIPAL = 6;
+	  FREE_CALL = 7;
+	  GUARD_CALL = 8;
+          LINK_IMAGE = 9;
 	  ///
 
 	  GET_LOCAL_PRINCIPAL = 20;
