@@ -240,15 +240,16 @@ class LatteAttestationManager: public LatteDispatcher {
       /// deleting latest principal
       log("after erase the range");
       if (latest) {
-        auto speaker = latest->speaker();
+        //auto speaker = latest->speaker();
         auto name = principal_name(*latest);
-        auto ip = latest->auth().ip();
+        //auto ip = latest->auth().ip();
         //auto plo = latest->auth().port_lo();
         //auto phi = latest->auth().port_hi();
-        auto image = latest->code().image();
-        auto config = latest->code().config().at(LEGACY_CONFIG_KEY);
-        log("deleting principal: id = %u, maxgn = %u, latest = %p, speaker = %u, pid = %u, uid = %u",
-            p->id(), maxgn, latest.get(), speaker, cmd->pid(), cmd->uid());
+        //auto image = latest->code().image();
+        //auto config = latest->code().config().at(LEGACY_CONFIG_KEY);
+        //log("deleting principal: id = %u, maxgn = %u, latest = %p, speaker = %u, pid = %u, uid = %u",
+        //    p->id(), maxgn, latest.get(), speaker, cmd->pid(), cmd->uid());
+        log("deleting principal %s", name.c_str());
 
         plock_.unlock();
         metadata_service_->delete_instance(cmd->auth(), name);
