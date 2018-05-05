@@ -145,7 +145,7 @@ class LatteAttestationManager: public LatteDispatcher {
 
     static inline std::string principal_name(const proto::Principal &p) {
       std::stringstream ss;
-      ss << p.id() << ":" << p.gn();
+      ss << p.id() << "_" << p.gn();
       return ss.str();
     }
 
