@@ -495,7 +495,7 @@ bool MetadataServiceClient::create_instance(const std::string &speaker,
 
 bool MetadataServiceClient::delete_instance(const std::string &speaker,
     const std::string &pid) {
-  this->post_statement("/lazyDelInstance", speaker, {pid})
+  this->post_statement("/lazyDeleteInstance", speaker, {pid})
     .then(debug_task())
     .then(json_task("creating instance new")).wait();
   return true;
