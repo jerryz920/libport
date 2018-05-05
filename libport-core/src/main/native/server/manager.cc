@@ -212,17 +212,20 @@ class LatteAttestationManager: public LatteDispatcher {
         return proto::make_shared_status_response(false,
               "principal not found or mal-formed");
       }
+      log("entering delete principal");
 
       uint64_t maxgn = 0;
       std::shared_ptr<proto::Principal> latest = nullptr;
       plock_.lock();
       auto matched = principals_.equal_range(p->id());
       for (auto i = matched.first; i != matched.second; ++i) {
+        log("find gn %d", i->second->gn());
         if (maxgn <= i->second->gn()) {
           maxgn = i->second->gn();
           latest = i->second;
         }
       }
+      log("looking for latest principal, found: %d", maxgn);
       if (latest) {
         auto speaker = latest->speaker();
         if ((speaker != cmd->pid() && cmd->uid() != 0)) {
@@ -235,16 +238,18 @@ class LatteAttestationManager: public LatteDispatcher {
       //// authenticate if deletion is allowed!
 
       /// deleting latest principal
+      log("after erase the range");
       if (latest) {
-        auto speaker = latest->speaker();
+        //auto speaker = latest->speaker();
         auto name = principal_name(*latest);
-        auto ip = latest->auth().ip();
+        //auto ip = latest->auth().ip();
         //auto plo = latest->auth().port_lo();
         //auto phi = latest->auth().port_hi();
-        auto image = latest->code().image();
-        auto config = latest->code().config().at(LEGACY_CONFIG_KEY);
-        log("deleting principal: id = %u, maxgn = %u, latest = %p, speaker = %u, pid = %u, uid = %u",
-            p->id(), maxgn, latest.get(), speaker, cmd->pid(), cmd->uid());
+        //auto image = latest->code().image();
+        //auto config = latest->code().config().at(LEGACY_CONFIG_KEY);
+        //log("deleting principal: id = %u, maxgn = %u, latest = %p, speaker = %u, pid = %u, uid = %u",
+        //    p->id(), maxgn, latest.get(), speaker, cmd->pid(), cmd->uid());
+        log("deleting principal %s", name.c_str());
 
         plock_.unlock();
         metadata_service_->delete_instance(cmd->auth(), name);
